@@ -1,50 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { engine, useEngine } from '../../lib/engine';
+import { useData } from '../../context/DataContext';
 import ChatScreen from './ChatScreen';
 import DiscoverScreen from './DiscoverScreen';
 import ProfileScreen from './ProfileScreen';
 import SafetyScreen from './SafetyScreen';
 import PhoneAuthScreen from './PhoneAuthScreen';
 import { I } from '../ui';
-import { Smartphone, RotateCcw, Shield, CheckCircle2, Wifi, Battery, Signal, Zap } from 'lucide-react';
+import { RotateCcw, Wifi, Battery, Signal } from 'lucide-react';
 import { fmtCountdown } from '../../lib/utils';
 
 type Tab = 'discover' | 'chats' | 'safety' | 'profile';
 type DeviceModel = 'iphone' | 'pixel';
 
 export default function PhoneApp() {
-  const state = useEngine();
+  const { isAuthenticated, currentUser, quickLogin } = useAuth();
+  const { activeSos, activeTimer } = useData();
+
   const [tab, setTab] = useState<Tab>('discover');
   const [safetyMode, setSafetyMode] = useState<'timer' | 'sos'>('timer');
   const [threadId, setThreadId] = useState<string | null>(null);
   const [deviceModel, setDeviceModel] = useState<DeviceModel>('iphone');
   const [clock, setClock] = useState(() => new Date());
+  const [visualClock, setVisualClock] = useState(() => Date.now());
 
   useEffect(() => {
-    const t = setInterval(() => setClock(new Date()), 1000);
+    const t = setInterval(() => {
+      setClock(new Date());
+      setVisualClock(Date.now());
+    }, 1000);
     return () => clearInterval(t);
   }, []);
 
-  const { isAuthenticated, currentUser } = useAuth();
-  const me = currentUser || (state.personaId ? engine.user(state.personaId) : engine.persona());
-
-  // switching persona closes open thread so inbox always matches the session
+  // When session user changes, reset thread
   useEffect(() => {
     setThreadId(null);
-  }, [me?.id]);
+  }, [currentUser?.id]);
 
-  const activeSos = me ? engine.activeSosFor(me.id) : null;
-  const currentTimer = me ? state.timers.find((t) => t.userId === me.id && ['active', 'extended', 'expired'].includes(t.status)) : null;
-  const activeTimer = Boolean(currentTimer && ['active', 'extended'].includes(currentTimer.status));
-  const timerRemain = currentTimer ? Math.max(0, currentTimer.expiresAtV - state.vnow) : 0;
+  const timerRemain = activeTimer
+    ? Math.max(0, new Date(activeTimer.expiresAt).getTime() - visualClock)
+    : 0;
 
-  const goChat = (userId: string) => {
-    const id = engine.openChatWith(userId);
-    if (id) {
-      setThreadId(id);
-      setTab('chats');
-    }
+  const goChat = (_userId: string) => {
+    setThreadId(null);
+    setTab('chats');
   };
 
   const handleResetDevice = () => {
@@ -53,10 +52,20 @@ export default function PhoneApp() {
     setSafetyMode('timer');
   };
 
-  const tabs: { id: Tab; label: string; icon: (p: { size?: number }) => React.ReactNode; dot?: 'sos' | 'timer' }[] = [
+  const tabs: {
+    id: Tab;
+    label: string;
+    icon: (p: { size?: number }) => React.ReactNode;
+    dot?: 'sos' | 'timer';
+  }[] = [
     { id: 'discover', label: 'Discover', icon: (p) => <I.radar {...p} /> },
     { id: 'chats', label: 'Chats', icon: (p) => <I.chat {...p} /> },
-    { id: 'safety', label: 'Safety', icon: (p) => <I.shield {...p} />, dot: activeSos ? 'sos' : activeTimer ? 'timer' : undefined },
+    {
+      id: 'safety',
+      label: 'Safety',
+      icon: (p) => <I.shield {...p} />,
+      dot: activeSos ? 'sos' : activeTimer ? 'timer' : undefined,
+    },
     { id: 'profile', label: 'Profile', icon: (p) => <I.id {...p} /> },
   ];
 
@@ -106,24 +115,25 @@ export default function PhoneApp() {
 
           {/* Quick Persona Switching for Device */}
           <div className="flex items-center gap-1">
-            {['u_aisha', 'u_rohan'].map((id) => {
-              const u = engine.user(id);
-              if (!u) return null;
-              const isCurrent = me?.id === u.id;
+            {[
+              { username: 'aisha.k', name: 'Aisha' },
+              { username: 'rohan.m', name: 'Rohan' },
+            ].map((p) => {
+              const isCurrent = currentUser?.username?.toLowerCase() === p.username;
               return (
                 <button
-                  key={u.id}
+                  key={p.username}
                   type="button"
-                  id={`btn-sim-persona-${u.username}`}
-                  onClick={() => engine.setPersona(u.id)}
-                  title={`Switch simulator to ${u.name}`}
+                  id={`btn-sim-persona-${p.username.split('.')[0]}`}
+                  onClick={() => quickLogin(p.username)}
+                  title={`Switch simulator session to ${p.name}`}
                   className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold transition-all ${
                     isCurrent
                       ? 'bg-amber text-night-950 shadow-sm'
                       : 'bg-night-800 text-mute hover:text-ink hover:bg-night-750'
                   }`}
                 >
-                  {u.name.split(' ')[0]}
+                  {p.name}
                 </button>
               );
             })}
@@ -166,13 +176,17 @@ export default function PhoneApp() {
                 {activeSos ? (
                   <>
                     <span className="h-2 w-2 rounded-full bg-sos animate-ping" />
-                    <span className="font-display text-[10px] font-extrabold text-sos tracking-wider">EMERGENCY</span>
+                    <span className="font-display text-[10px] font-extrabold text-sos tracking-wider">
+                      EMERGENCY
+                    </span>
                     <span className="h-1.5 w-1.5 rounded-full bg-night-800" />
                   </>
                 ) : activeTimer ? (
                   <>
                     <span className="h-2 w-2 rounded-full bg-amber pulse-dot" />
-                    <span className="font-mono text-[10px] font-bold text-amber">{fmtCountdown(timerRemain)}</span>
+                    <span className="font-mono text-[10px] font-bold text-amber">
+                      {fmtCountdown(timerRemain)}
+                    </span>
                     <span className="h-1.5 w-1.5 rounded-full bg-night-800" />
                   </>
                 ) : (
@@ -198,7 +212,7 @@ export default function PhoneApp() {
             </div>
           </div>
 
-          {!isAuthenticated || !me ? (
+          {!isAuthenticated || !currentUser ? (
             /* Unauthenticated Screen inside Mobile Frame */
             <div className="relative z-10 flex-1 overflow-hidden">
               <PhoneAuthScreen />
@@ -219,27 +233,31 @@ export default function PhoneApp() {
 
                 {/* Top User Status Badge */}
                 <div
-                  key={me.id}
+                  key={currentUser.id}
                   className="anim-fade flex items-center gap-1.5 rounded-full border border-line-soft bg-night-800/80 py-1 pl-1 pr-2.5"
                 >
                   <span className="relative">
                     <span
                       className="block h-6 w-6 overflow-hidden rounded-full"
                       style={{
-                        background: `linear-gradient(135deg, hsl(${me.avatarHue} 85% 68%), hsl(${(me.avatarHue + 42) % 360} 80% 55%))`,
+                        background: `linear-gradient(135deg, hsl(${currentUser.avatarHue} 85% 68%), hsl(${(currentUser.avatarHue + 42) % 360} 80% 55%))`,
                       }}
                     >
                       <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-night-950">
-                        {me.name
+                        {currentUser.name
                           .split(' ')
                           .map((w) => w[0])
                           .join('')}
                       </span>
                     </span>
-                    {activeSos && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-sos pulse-dot" />}
+                    {activeSos && (
+                      <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-sos pulse-dot" />
+                    )}
                   </span>
-                  <span className="text-[11px] font-bold text-ink">{me.name.split(' ')[0]}</span>
-                  {me.isVerified && (
+                  <span className="text-[11px] font-bold text-ink">
+                    {currentUser.name.split(' ')[0]}
+                  </span>
+                  {currentUser.isVerified && (
                     <span className="text-sky" title="Verified Identity">
                       <I.logo size={11} strokeWidth={2.5} />
                     </span>
@@ -249,7 +267,7 @@ export default function PhoneApp() {
 
               {/* Active Screen Body */}
               <div className="relative z-0 flex-1 overflow-hidden">
-                <div key={`${tab}-${threadId ?? 'list'}-${me.id}`} className="anim-fade h-full">
+                <div key={`${tab}-${threadId ?? 'list'}-${currentUser.id}`} className="anim-fade h-full">
                   {tab === 'discover' && <DiscoverScreen goChat={goChat} />}
                   {tab === 'chats' && <ChatScreen threadId={threadId} openThread={setThreadId} />}
                   {tab === 'safety' && <SafetyScreen mode={safetyMode} setMode={setSafetyMode} />}
@@ -322,7 +340,7 @@ export default function PhoneApp() {
       <div className="mt-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-dim">
         <span className="flex h-2 w-2 rounded-full bg-safe pulse-dot" />
         <span>Mobile Simulator · Expo SDK 57 · Running as</span>
-        <span className="font-bold text-amber">@{me?.username || 'Guest'}</span>
+        <span className="font-bold text-amber">@{currentUser?.username || 'Guest'}</span>
       </div>
     </div>
   );

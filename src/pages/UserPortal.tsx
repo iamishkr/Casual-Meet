@@ -1,22 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { engine, useEngine } from '../lib/engine';
+import { useData } from '../context/DataContext';
+import { api } from '../lib/api';
 import PhoneApp from '../components/phone/PhoneApp';
 import DiscoverScreen from '../components/phone/DiscoverScreen';
 import ChatScreen from '../components/phone/ChatScreen';
 import SafetyScreen from '../components/phone/SafetyScreen';
 import ProfileScreen from '../components/phone/ProfileScreen';
-import { Avatar, Badge, I, Ring } from '../components/ui';
+import { Avatar, Badge, I } from '../components/ui';
 import { fmtCountdown } from '../lib/utils';
 import { Zap } from 'lucide-react';
+import type { EmergencyContactDTO, SafeZoneDTO } from '../lib/types';
 
 type NavTab = 'discover' | 'chats' | 'safety' | 'profile';
 type ViewMode = 'web' | 'split' | 'mobile';
 
 export default function UserPortal() {
-  const { currentUser, logout, isAdmin } = useAuth();
-  const state = useEngine();
+  const { currentUser, logout, isAdmin, quickLogin } = useAuth();
+  const { activeSos, activeTimer, unreadCount, markTimerSafe, extendTimer } = useData();
   const navigate = useNavigate();
 
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
@@ -25,29 +27,38 @@ export default function UserPortal() {
   const [tab, setTab] = useState<NavTab>('discover');
   const [threadId, setThreadId] = useState<string | null>(null);
   const [safetyMode, setSafetyMode] = useState<'timer' | 'sos'>('timer');
+  const [contacts, setContacts] = useState<EmergencyContactDTO[]>([]);
+  const [safeZones, setSafeZones] = useState<SafeZoneDTO[]>([]);
+  const [visualClock, setVisualClock] = useState(() => Date.now());
 
-  const me = engine.persona();
-  const activeSos = engine.activeSosFor(me.id);
-  const activeTimer = state.timers.find((t) => t.userId === me.id && ['active', 'extended', 'expired'].includes(t.status));
+  useEffect(() => {
+    const t = setInterval(() => setVisualClock(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      api.contacts.list().then(setContacts).catch(() => {});
+      api.safeZones.list().then(setSafeZones).catch(() => {});
+    }
+  }, [currentUser]);
 
   const goChat = (userId: string) => {
-    const id = engine.openChatWith(userId);
-    if (id) {
-      setThreadId(id);
-      setTab('chats');
-    }
+    setTab('chats');
   };
 
-  const navItems: { id: NavTab; label: string; icon: (p: { size?: number }) => React.ReactNode; badge?: number }[] = [
+  const navItems: {
+    id: NavTab;
+    label: string;
+    icon: (p: { size?: number }) => React.ReactNode;
+    badge?: number;
+  }[] = [
     { id: 'discover', label: 'Discover Nearby', icon: (p) => <I.radar {...p} /> },
     {
       id: 'chats',
       label: 'Conversations',
       icon: (p) => <I.chat {...p} />,
-      badge: state.messages.filter((m) => {
-        const chat = state.chats.find((c) => c.id === m.chatId);
-        return chat?.participants.includes(me.id) && m.senderId !== me.id && m.status !== 'read';
-      }).length,
+      badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
       id: 'safety',
@@ -57,6 +68,12 @@ export default function UserPortal() {
     },
     { id: 'profile', label: 'My Safety Profile', icon: (p) => <I.id {...p} /> },
   ];
+
+  if (!currentUser) return null;
+
+  const timerRemain = activeTimer
+    ? Math.max(0, new Date(activeTimer.expiresAt).getTime() - visualClock)
+    : 0;
 
   return (
     <div className="scene-bg scene-grid min-h-screen text-ink">
@@ -120,31 +137,35 @@ export default function UserPortal() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Quick Persona Switcher */}
+            {/* Real Backend Persona Switcher for Development Testing */}
             <div className="hidden items-center gap-1.5 md:flex">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-dim">Persona:</span>
-              {['u_aisha', 'u_rohan'].map((id) => {
-                const u = engine.user(id);
+              <span className="font-mono text-[9px] uppercase tracking-widest text-dim">
+                User:
+              </span>
+              {[
+                { username: 'aisha.k', name: 'Aisha' },
+                { username: 'rohan.m', name: 'Rohan' },
+              ].map((p) => {
+                const isCurrent = currentUser.username.toLowerCase() === p.username;
                 return (
                   <button
-                    key={u.id}
+                    key={p.username}
                     type="button"
-                    id={`persona-btn-${u.username}`}
-                    onClick={() => engine.setPersona(u.id)}
-                    className={`btn-press flex items-center gap-1.5 rounded-lg border py-0.5 pl-1 pr-2 text-xs transition-colors ${
-                      me.id === u.id
+                    id={`persona-btn-${p.username}`}
+                    onClick={() => quickLogin(p.username)}
+                    className={`btn-press flex items-center gap-1.5 rounded-lg border py-0.5 px-2 text-xs transition-colors ${
+                      isCurrent
                         ? 'border-amber/50 bg-amber/10 text-amber font-bold'
                         : 'border-line-soft bg-night-850 text-mute hover:border-line'
                     }`}
                   >
-                    <Avatar user={u} size={20} />
-                    <span>{u.name.split(' ')[0]}</span>
+                    <span>{p.name}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Admin link if creator */}
+            {/* Admin link if administrator */}
             {isAdmin && (
               <Link
                 to="/admin"
@@ -156,16 +177,23 @@ export default function UserPortal() {
 
             {/* User profile dropdown pill */}
             <div className="flex items-center gap-2 rounded-xl border border-line-soft bg-night-850 py-1 pl-1.5 pr-2.5">
-              <Avatar user={me} size={26} />
+              <Avatar user={currentUser} size={26} />
               <div className="leading-tight text-left">
                 <p className="flex items-center gap-1 text-xs font-bold">
-                  {me.name}
-                  {me.isVerified && <span className="text-sky"><I.logo size={11} strokeWidth={2.4} /></span>}
+                  {currentUser.name}
+                  {currentUser.isVerified && (
+                    <span className="text-sky">
+                      <I.logo size={11} strokeWidth={2.4} />
+                    </span>
+                  )}
                 </p>
-                <p className="font-mono text-[9px] text-dim">@{me.username}</p>
+                <p className="font-mono text-[9px] text-dim">@{currentUser.username}</p>
               </div>
               <button
-                onClick={() => { logout(); navigate('/login'); }}
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
                 className="ml-2 rounded p-1 text-dim hover:bg-night-750 hover:text-sos transition-colors"
                 title="Sign out"
               >
@@ -192,7 +220,9 @@ export default function UserPortal() {
                 {/* Left Sidebar Navigation */}
                 <aside className="panel flex flex-row justify-around rounded-2xl p-2.5 lg:flex-col lg:justify-start lg:gap-1.5 lg:p-3.5">
                   <div className="mb-2 hidden px-2 lg:block">
-                    <p className="font-mono text-[9px] uppercase tracking-widest text-dim">Web Navigation</p>
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-dim">
+                      Web Navigation
+                    </p>
                   </div>
 
                   {navItems.map((item) => {
@@ -266,7 +296,7 @@ export default function UserPortal() {
                 <div className="panel rounded-2xl p-3.5">
                   <div className="flex items-center justify-between border-b border-line-soft pb-2">
                     <span className="flex items-center gap-1.5 text-xs font-bold">
-                      <I.timer size={13} className="text-amber" /> Active Safety State
+                      <I.timer size={13} className="text-amber" /> Authoritative Safety
                     </span>
                     <Badge tone={activeSos ? 'err' : activeTimer ? 'warn' : 'ok'}>
                       {activeSos ? 'SOS ALERT' : activeTimer ? 'TIMER ON' : 'IDLE / SAFE'}
@@ -274,21 +304,23 @@ export default function UserPortal() {
                   </div>
                   {activeTimer ? (
                     <div className="pt-2 text-center">
-                      <p className="font-display text-xs font-bold text-ink">{activeTimer.locationName}</p>
+                      <p className="font-display text-xs font-bold text-ink">
+                        {activeTimer.locationName}
+                      </p>
                       <p className="font-mono text-base font-extrabold text-amber">
-                        {fmtCountdown(Math.max(0, activeTimer.expiresAtV - state.vnow))}
+                        {fmtCountdown(timerRemain)}
                       </p>
                       <div className="mt-2 flex gap-1.5">
                         <button
                           type="button"
-                          onClick={() => engine.markSafe(activeTimer.id)}
+                          onClick={() => markTimerSafe(activeTimer._id)}
                           className="btn-press flex-1 rounded-lg bg-safe py-1 text-xs font-bold text-night-950"
                         >
                           I'm Safe
                         </button>
                         <button
                           type="button"
-                          onClick={() => engine.extendTimer(activeTimer.id, 15)}
+                          onClick={() => extendTimer(activeTimer._id, 15)}
                           className="btn-press flex-1 rounded-lg border border-line-soft bg-night-800 py-1 text-xs font-semibold text-mute hover:text-ink"
                         >
                           +15 min
@@ -318,19 +350,20 @@ export default function UserPortal() {
                     <span className="flex items-center gap-1.5 text-xs font-bold">
                       <I.phone size={13} className="text-sky" /> Emergency Contacts
                     </span>
-                    <span className="font-mono text-[10px] text-dim">
-                      {state.contacts.filter((c) => c.userId === me.id).length}/5
-                    </span>
+                    <span className="font-mono text-[10px] text-dim">{contacts.length}/5</span>
                   </div>
                   <div className="space-y-1">
-                    {state.contacts.filter((c) => c.userId === me.id).slice(0, 2).map((c) => (
-                      <div key={c.id} className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 px-2 py-1 text-xs">
+                    {contacts.slice(0, 2).map((c) => (
+                      <div
+                        key={c._id}
+                        className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 px-2 py-1 text-xs"
+                      >
                         <span className="truncate font-semibold text-ink">{c.name}</span>
                         <span className="font-mono text-[9px] text-safe">SMS ready</span>
                       </div>
                     ))}
-                    {state.contacts.filter((c) => c.userId === me.id).length === 0 && (
-                      <p className="text-[11px] text-mute">No contacts configured.</p>
+                    {contacts.length === 0 && (
+                      <p className="text-[11px] text-mute">No contacts configured on backend.</p>
                     )}
                   </div>
                 </div>
@@ -341,13 +374,18 @@ export default function UserPortal() {
                     <span className="flex items-center gap-1.5 text-xs font-bold">
                       <I.shield size={13} className="text-safe" /> Safe Meeting Zones
                     </span>
-                    <span className="font-mono text-[10px] text-dim">{state.safeZones.length} verified</span>
+                    <span className="font-mono text-[10px] text-dim">{safeZones.length} verified</span>
                   </div>
                   <div className="space-y-1">
-                    {state.safeZones.slice(0, 2).map((z) => (
-                      <div key={z.id} className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 px-2 py-1 text-xs">
+                    {safeZones.slice(0, 2).map((z) => (
+                      <div
+                        key={z.id}
+                        className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 px-2 py-1 text-xs"
+                      >
                         <span className="truncate font-semibold text-ink">{z.name}</span>
-                        <span className="font-mono text-[9px] text-amber uppercase">{z.category.replace('_', ' ')}</span>
+                        <span className="font-mono text-[9px] text-amber uppercase">
+                          {z.category.replace('_', ' ')}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -368,7 +406,9 @@ export default function UserPortal() {
             {/* Left Sidebar Navigation */}
             <aside className="panel flex flex-row justify-around rounded-2xl p-2.5 lg:flex-col lg:justify-start lg:gap-1.5 lg:p-4">
               <div className="mb-2 hidden px-2 lg:block">
-                <p className="font-mono text-[9px] uppercase tracking-widest text-dim">Navigation</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-dim">
+                  Navigation
+                </p>
               </div>
 
               {navItems.map((item) => {
@@ -449,21 +489,23 @@ export default function UserPortal() {
                 {activeTimer ? (
                   <div className="pt-3 text-center">
                     <p className="text-xs text-mute">Meeting in progress</p>
-                    <p className="font-display text-sm font-bold text-ink">{activeTimer.locationName}</p>
+                    <p className="font-display text-sm font-bold text-ink">
+                      {activeTimer.locationName}
+                    </p>
                     <p className="mt-1 font-mono text-xl font-extrabold text-amber">
-                      {fmtCountdown(Math.max(0, activeTimer.expiresAtV - state.vnow))}
+                      {fmtCountdown(timerRemain)}
                     </p>
                     <div className="mt-3 flex gap-2">
                       <button
                         type="button"
-                        onClick={() => engine.markSafe(activeTimer.id)}
+                        onClick={() => markTimerSafe(activeTimer._id)}
                         className="btn-press flex-1 rounded-lg bg-safe py-1.5 text-xs font-bold text-night-950"
                       >
                         I'm Safe
                       </button>
                       <button
                         type="button"
-                        onClick={() => engine.extendTimer(activeTimer.id, 15)}
+                        onClick={() => extendTimer(activeTimer._id, 15)}
                         className="btn-press flex-1 rounded-lg border border-line-soft bg-night-800 py-1.5 text-xs font-semibold text-mute hover:text-ink"
                       >
                         +15 min
@@ -494,17 +536,20 @@ export default function UserPortal() {
                     <I.phone size={14} className="text-sky" /> Emergency Circle
                   </span>
                   <span className="font-mono text-[10px] text-dim">
-                    {state.contacts.filter((c) => c.userId === me.id).length}/5 contacts
+                    {contacts.length}/5 contacts
                   </span>
                 </div>
                 <div className="space-y-1.5">
-                  {state.contacts.filter((c) => c.userId === me.id).slice(0, 3).map((c) => (
-                    <div key={c.id} className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 px-2.5 py-1.5 text-xs">
+                  {contacts.slice(0, 3).map((c) => (
+                    <div
+                      key={c._id}
+                      className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 px-2.5 py-1.5 text-xs"
+                    >
                       <span className="truncate font-semibold text-ink">{c.name}</span>
                       <span className="font-mono text-[10px] text-safe">SMS ready</span>
                     </div>
                   ))}
-                  {state.contacts.filter((c) => c.userId === me.id).length === 0 && (
+                  {contacts.length === 0 && (
                     <p className="text-xs text-mute">No emergency contacts configured yet.</p>
                   )}
                 </div>
@@ -516,8 +561,11 @@ export default function UserPortal() {
                   Nearby Verified Safe Zones
                 </p>
                 <div className="space-y-2">
-                  {state.safeZones.slice(0, 3).map((z) => (
-                    <div key={z.id} className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 p-2 text-xs">
+                  {safeZones.slice(0, 3).map((z) => (
+                    <div
+                      key={z.id}
+                      className="flex items-center justify-between rounded-lg border border-line-soft bg-night-900/60 p-2 text-xs"
+                    >
                       <div>
                         <p className="font-bold text-ink">{z.name}</p>
                         <p className="text-[10px] text-mute">{z.area}</p>

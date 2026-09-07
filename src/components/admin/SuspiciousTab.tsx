@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { engine, useEngine } from '../../lib/engine';
+import { useToast } from '../../context/ToastContext';
 import { I, Btn, Badge, Empty, Reveal, Avatar, Modal, Field, inputCls } from '../ui';
 import type { SuspendType } from '../../lib/types';
 
 export default function SuspiciousTab() {
-  const state = useEngine();
+  const { toast } = useToast();
   const [data, setData] = useState<{
     flaggedMessages: any[];
     lowTrustUsers: any[];
@@ -26,26 +26,11 @@ export default function SuspiciousTab() {
       const res = await api.admin.getSuspiciousActivity();
       setData(res);
     } catch {
-      // Fallback to local engine simulation if needed
-      const flagged = state.messages
-        .filter((m) => m.type !== 'text' || m.content.match(/\b(?:\d{10}|[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64})\b/))
-        .map((m) => ({
-          _id: m.id,
-          content: m.content,
-          senderId: engine.user(m.senderId),
-          containsSensitive: true,
-          sensitiveKinds: ['upi', 'phone'],
-          createdAt: new Date(m.sentAt),
-        }));
-
-      const lowTrust = state.users.filter((u) => u.trustScore < 90 && u.role === 'user');
-      const activeT = state.timers.filter((t) => t.status === 'active');
-
       setData({
-        flaggedMessages: flagged,
-        lowTrustUsers: lowTrust,
-        activeTimers: activeT,
-        recentSuspensions: state.suspensions,
+        flaggedMessages: [],
+        lowTrustUsers: [],
+        activeTimers: [],
+        recentSuspensions: [],
       });
     } finally {
       setLoading(false);
@@ -64,8 +49,7 @@ export default function SuspiciousTab() {
 
     try {
       await api.admin.suspendUser(actionUser._id || actionUser.id, suspendType, reason.trim(), 7);
-      engine.suspendUser(actionUser._id || actionUser.id, suspendType, reason.trim());
-      engine.toast('warn', `Action applied against @${actionUser.username}`, `${suspendType.replace('_', ' ')} enforced.`);
+      toast('warn', `Action applied against @${actionUser.username}`, `${suspendType.replace('_', ' ')} enforced.`);
       setActionUser(null);
       setReason('');
       setReasonErr('');
@@ -126,7 +110,7 @@ export default function SuspiciousTab() {
                 <Empty icon={<I.shield size={26} />} title="All chat streams clean" sub="No sensitive payment IDs or phone numbers detected in recent messages." />
               ) : (
                 flagged.map((m) => {
-                  const sender = m.senderId?.name ? m.senderId : engine.user(m.senderId);
+                  const sender = m.senderId?.name ? m.senderId : { name: 'User', username: 'user' };
                   return (
                     <div key={m._id || m.id} className="rounded-lg border border-sos/30 bg-sos/5 p-3">
                       <div className="flex items-center justify-between">

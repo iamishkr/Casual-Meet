@@ -1,3 +1,14 @@
+import type {
+  DiscoverItem,
+  EmergencyContactDTO,
+  MeetingTimerDTO,
+  Relationship,
+  SafeZoneDTO,
+  SosIncidentDTO,
+  UserReportDTO,
+  VerificationMineDTO,
+} from './types';
+
 const isCapacitor =
   typeof window !== 'undefined' &&
   (Boolean((window as any).Capacitor) || window.location.protocol === 'capacitor:');
@@ -6,20 +17,26 @@ const API_BASE =
   (import.meta as any).env?.VITE_API_BASE_URL ||
   (isCapacitor ? 'http://192.168.1.6:5000/api' : '/api');
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthToken(): string | null {
   try {
     const raw = localStorage.getItem('casualmeet_auth_session_v1');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.token) {
-        return {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${parsed.token}`,
-        };
-      }
+      return parsed?.token || null;
     }
   } catch {
     // ignore
+  }
+  return null;
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  if (token) {
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
   }
   return { 'Content-Type': 'application/json' };
 }
@@ -43,7 +60,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const api = {
-  health: () => request<{ status: string; service: string; database: string }>('/health'),
+  health: () => request<{ status: string; service: string; database: string; serverTime: string }>('/health'),
 
   auth: {
     login: (identifier: string, password?: string, targetRole?: string) =>
@@ -78,7 +95,55 @@ export const api = {
       }),
   },
 
-  discover: (maxKm: number = 10) => request<any[]>(`/discover?maxKm=${maxKm}`),
+  discover: (maxKm: number = 10) => request<DiscoverItem[]>(`/discover?maxKm=${maxKm}`),
+
+  location: {
+    update: (latitude: number, longitude: number) =>
+      request<{ success: boolean; updatedAt: string; message: string }>('/location', {
+        method: 'PUT',
+        body: JSON.stringify({ latitude, longitude }),
+      }),
+  },
+
+  safeZones: {
+    list: () => request<SafeZoneDTO[]>('/safe-zones'),
+  },
+
+  contacts: {
+    list: () => request<EmergencyContactDTO[]>('/contacts'),
+    create: (data: { name: string; phone: string; relationship?: Relationship; notifyOnSos?: boolean }) =>
+      request<EmergencyContactDTO>('/contacts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<{ name: string; phone: string; relationship: Relationship; notifyOnSos: boolean }>) =>
+      request<EmergencyContactDTO>(`/contacts/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean; message: string }>(`/contacts/${id}`, {
+        method: 'DELETE',
+      }),
+  },
+
+  verification: {
+    mine: () => request<VerificationMineDTO>('/verification/mine'),
+    submit: (selfieUrl: string) =>
+      request<{ success: boolean; message: string; verificationId: string; status: string }>('/verification/submit', {
+        method: 'POST',
+        body: JSON.stringify({ selfieUrl }),
+      }),
+  },
+
+  reports: {
+    create: (data: { reportedUserId: string; category?: string; reason: string; details?: string }) =>
+      request<{ success: boolean; message: string; reportId: string }>('/reports', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    mine: () => request<UserReportDTO[]>('/reports/mine'),
+  },
 
   connections: {
     list: () => request<any[]>('/connections'),
@@ -88,7 +153,7 @@ export const api = {
         body: JSON.stringify({ targetUserId }),
       }),
     accept: (id: string) =>
-      request<any>(`/connections/${id}/accept`, {
+      request<{ connection: any; chatId: string }>(`/connections/${id}/accept`, {
         method: 'PUT',
       }),
     reject: (id: string) =>
@@ -101,7 +166,7 @@ export const api = {
     list: () => request<any[]>('/chats'),
     getMessages: (chatId: string) => request<any[]>(`/chats/${chatId}/messages`),
     sendMessage: (chatId: string, content: string, type: string = 'text') =>
-      request<any>(`/chats/${chatId}/messages`, {
+      request<{ message: any; flagged: boolean; sensitiveDetails: string[] }>(`/chats/${chatId}/messages`, {
         method: 'POST',
         body: JSON.stringify({ content, type }),
       }),
@@ -112,36 +177,36 @@ export const api = {
   },
 
   timers: {
-    list: () => request<any[]>('/timers'),
-    start: (data: { durationMinutes: number; locationName: string; meetWithUserId?: string }) =>
-      request<any>('/timers/start', {
+    list: () => request<MeetingTimerDTO[]>('/timers'),
+    start: (data: { durationMinutes: number; locationName: string; meetWithUserId?: string; testExpireNow?: boolean }) =>
+      request<MeetingTimerDTO>('/timers/start', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     safe: (id: string) =>
-      request<any>(`/timers/${id}/safe`, {
+      request<MeetingTimerDTO>(`/timers/${id}/safe`, {
         method: 'PUT',
       }),
     extend: (id: string, extraMinutes: number = 15) =>
-      request<any>(`/timers/${id}/extend`, {
+      request<MeetingTimerDTO>(`/timers/${id}/extend`, {
         method: 'PUT',
         body: JSON.stringify({ extraMinutes }),
       }),
     cancel: (id: string) =>
-      request<any>(`/timers/${id}/cancel`, {
+      request<MeetingTimerDTO>(`/timers/${id}/cancel`, {
         method: 'PUT',
       }),
   },
 
   sos: {
-    getActive: () => request<any>('/sos/active'),
+    getActive: () => request<SosIncidentDTO | null>('/sos/active'),
     trigger: (data: { locationName?: string; source?: string; timerId?: string; includeLocation?: boolean }) =>
-      request<any>('/sos/trigger', {
+      request<{ sos: SosIncidentDTO; contactsAlerted: number; dispatchDetails: any[] }>('/sos/trigger', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    resolve: (id: string, status: 'resolved' | 'false_alarm') =>
-      request<any>(`/sos/${id}/resolve`, {
+    resolve: (id: string, status: 'resolved' | 'false_alarm' = 'resolved') =>
+      request<SosIncidentDTO>(`/sos/${id}/resolve`, {
         method: 'POST',
         body: JSON.stringify({ status }),
       }),

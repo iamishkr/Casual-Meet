@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { I, Field, inputCls, Avatar } from '../ui';
-import { engine, useEngine } from '../../lib/engine';
+import { I, Field, inputCls } from '../ui';
 
 export default function PhoneAuthScreen() {
   const { login, register, quickLogin } = useAuth();
-  const state = useEngine();
   const [tab, setTab] = useState<'login' | 'register'>('login');
 
   const [username, setUsername] = useState('');
@@ -76,14 +74,24 @@ export default function PhoneAuthScreen() {
       {/* Tabs */}
       <div className="mt-5 flex rounded-xl border border-line-soft bg-night-850 p-1">
         <button
-          onClick={() => { setTab('login'); setError(null); }}
-          className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${tab === 'login' ? 'bg-night-700 text-amber shadow-sm' : 'text-mute hover:text-ink'}`}
+          onClick={() => {
+            setTab('login');
+            setError(null);
+          }}
+          className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+            tab === 'login' ? 'bg-night-700 text-amber shadow-sm' : 'text-mute hover:text-ink'
+          }`}
         >
           Sign In
         </button>
         <button
-          onClick={() => { setTab('register'); setError(null); }}
-          className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${tab === 'register' ? 'bg-night-700 text-amber shadow-sm' : 'text-mute hover:text-ink'}`}
+          onClick={() => {
+            setTab('register');
+            setError(null);
+          }}
+          className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition-all ${
+            tab === 'register' ? 'bg-night-700 text-amber shadow-sm' : 'text-mute hover:text-ink'
+          }`}
         >
           Register
         </button>
@@ -98,27 +106,35 @@ export default function PhoneAuthScreen() {
       {/* Quick 1-Tap Login Chips */}
       <div className="mt-4 rounded-xl border border-line-soft bg-night-800/50 p-2.5">
         <p className="mb-2 font-mono text-[9px] uppercase tracking-wider text-dim text-center">
-          1-Tap Demo Switcher
+          1-Tap MongoDB Switcher
         </p>
         <div className="grid grid-cols-2 gap-2">
-          {['u_aisha', 'u_rohan'].map((id) => {
-            const u = state.users.find((x) => x.id === id);
-            if (!u) return null;
-            return (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => quickLogin(u.id)}
-                className="btn-press flex items-center gap-2 rounded-lg border border-line-soft bg-night-850 p-1.5 hover:border-amber/40 text-left"
+          {[
+            { username: 'aisha.k', name: 'Aisha', avatarHue: 35 },
+            { username: 'rohan.m', name: 'Rohan', avatarHue: 200 },
+          ].map((u) => (
+            <button
+              key={u.username}
+              type="button"
+              onClick={() => quickLogin(u.username)}
+              className="btn-press flex items-center gap-2 rounded-lg border border-line-soft bg-night-850 p-1.5 hover:border-amber/40 text-left"
+            >
+              <div
+                className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-night-950"
+                style={{
+                  background: `linear-gradient(135deg, hsl(${u.avatarHue} 85% 68%), hsl(${
+                    (u.avatarHue + 42) % 360
+                  } 80% 55%))`,
+                }}
               >
-                <Avatar user={u} size={24} />
-                <div className="min-w-0 flex-1 leading-tight">
-                  <p className="truncate text-[11px] font-bold text-ink">{u.name.split(' ')[0]}</p>
-                  <p className="text-[9px] text-dim">@{u.username}</p>
-                </div>
-              </button>
-            );
-          })}
+                {u.name[0]}
+              </div>
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="truncate text-[11px] font-bold text-ink">{u.name}</p>
+                <p className="text-[9px] text-dim">@{u.username}</p>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 

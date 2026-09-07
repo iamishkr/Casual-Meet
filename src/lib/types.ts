@@ -203,27 +203,103 @@ export interface Toast {
   sub?: string;
 }
 
-export interface AppState {
-  vnow: number; // virtual clock in ms (advances by dt × timeScale)
-  timeScale: 1 | 60 | 600;
-  personaId: string;
-  adminId: string;
-  users: User[];
-  locations: UserLocation[];
-  contacts: EmergencyContact[];
-  connections: Connection[];
-  chats: Chat[];
-  messages: Message[];
-  timers: MeetingTimer[];
-  sosEvents: SosEvent[];
-  deliveryLogs: SosDeliveryLog[];
-  verifications: VerificationRequest[];
-  reports: UserReport[];
-  suspensions: AccountSuspension[];
-  safeZones: SafeZone[];
-  daily: DayStat[];
-  feed: SysEvent[];
-  toasts: Toast[];
-  typing: Record<string, string | null>; // chatId -> userId typing
-  bootAtWall: number;
+export interface DiscoverUser {
+  id: string;
+  name: string;
+  username: string;
+  bio?: string;
+  city?: string;
+  occupation?: string;
+  interests: string[];
+  avatarHue: number;
+  isVerified: boolean;
+  trustScore: number;
+  age?: number;
+}
+
+export interface DiscoverItem {
+  user: DiscoverUser;
+  distanceKm: number;
+  coordinatesRedacted: string;
+  conn: {
+    id: string;
+    status: ConnStatus;
+    direction: 'in' | 'out';
+  } | null;
+}
+
+export interface SafeZoneDTO {
+  id: string;
+  name: string;
+  category: SafeZoneCategory;
+  area: string;
+  verificationLevel: string;
+  amenities: string[];
+  venueCoordinates: [number, number];
+  isPublicVenue: boolean;
+}
+
+export interface EmergencyContactDTO {
+  _id: string;
+  userId: string;
+  name: string;
+  phone: string;
+  relationship: Relationship;
+  notifyOnSos: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VerificationMineDTO {
+  isVerified: boolean;
+  trustScore: number;
+  latestRequest: {
+    _id: string;
+    userId: string;
+    status: VerifStatus;
+    reviewNote?: string;
+    reviewedBy?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;
+}
+
+export interface UserReportDTO {
+  _id: string;
+  reporterId: string;
+  reportedUserId: any;
+  reason: string;
+  details?: string;
+  status: ReportStatus;
+  actionNote?: string;
+  outcome?: ReportOutcome;
+  createdAt?: string;
+}
+
+export interface MeetingTimerDTO {
+  _id: string;
+  userId: string;
+  meetWithUserId?: any;
+  locationName: string;
+  durationMinutes: number;
+  startedAt: string;
+  expiresAt: string;
+  resolvedAt?: string;
+  status: TimerStatus;
+}
+
+export interface SosIncidentDTO {
+  _id: string;
+  userId: string;
+  source: SosSource;
+  location?: GeoPoint;
+  locationName: string;
+  status: SosStatus;
+  smsSent: boolean;
+  adminNotified: boolean;
+  contactsNotified: number;
+  lastDispatchAt?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  triggeredTimerId?: string;
 }

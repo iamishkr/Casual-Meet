@@ -1,27 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { engine, useEngine } from '../lib/engine';
 import AdminConsole from '../components/admin/AdminConsole';
-import { Avatar, I, Seg } from '../components/ui';
+import { Avatar, I } from '../components/ui';
 
 const SERVICES = [
   { name: 'API Server', note: 'express · zod · jwt' },
   { name: 'MongoDB', note: '2dsphere index' },
   { name: 'Socket.io', note: 'realtime websocket' },
-  { name: 'BullMQ', note: 'redis timer jobs' },
+  { name: 'Timer Worker', note: 'server safety worker' },
 ];
 
 const ENDPOINTS = [
-  'POST /api/auth/register', 'POST /api/auth/login', 'GET /api/discover', 'POST /api/connections/request',
-  'PUT /api/connections/:id/accept', 'GET /api/chats/:id/messages', 'POST /api/timers/start', 'PUT /api/timers/:id/safe',
-  'POST /api/sos/trigger', 'POST /api/sos/dispatch', 'POST /api/verification/submit', 'GET /api/admin/sos',
-  'POST /api/admin/reports/:id/resolve', 'POST /api/admin/users/:id/suspend', 'GET /api/admin/analytics/daily',
+  'POST /api/auth/register',
+  'POST /api/auth/login',
+  'GET /api/discover',
+  'POST /api/connections/request',
+  'PUT /api/connections/:id/accept',
+  'GET /api/chats/:id/messages',
+  'POST /api/timers/start',
+  'PUT /api/timers/:id/safe',
+  'POST /api/sos/trigger',
+  'POST /api/verification/submit',
+  'GET /api/admin/sos',
+  'POST /api/admin/reports/:id/resolve',
+  'POST /api/admin/users/:id/suspend',
+  'GET /api/admin/analytics/daily',
 ];
 
 export default function AdminPortal() {
   const { currentUser, logout } = useAuth();
-  const state = useEngine();
   const navigate = useNavigate();
 
   const [wall, setWall] = useState(() => new Date());
@@ -63,26 +71,14 @@ export default function AdminPortal() {
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {/* Simulation Clock Controls */}
-            <div className="flex items-center gap-2">
-              <div className="text-right leading-tight">
-                <p className="tick-num font-mono text-[12px] font-bold text-ink">
-                  {wall.toLocaleTimeString('en-IN', { hour12: false })}
-                </p>
-                <p className="font-mono text-[8px] uppercase tracking-widest text-dim">
-                  Clock ×{state.timeScale}
-                </p>
-              </div>
-              <Seg
-                size="sm"
-                value={String(state.timeScale) as '1' | '60' | '600'}
-                onChange={(v) => engine.setScale(Number(v) as 1 | 60 | 600)}
-                options={[
-                  { value: '1', label: '×1 Real' },
-                  { value: '60', label: '×60' },
-                  { value: '600', label: '×600 Fast' },
-                ]}
-              />
+            {/* Live Clock */}
+            <div className="text-right leading-tight">
+              <p className="tick-num font-mono text-[12px] font-bold text-ink">
+                {wall.toLocaleTimeString('en-IN', { hour12: false })} IST
+              </p>
+              <p className="font-mono text-[8px] uppercase tracking-widest text-dim">
+                Authoritative Server Time
+              </p>
             </div>
 
             {/* Switch to User Portal */}
@@ -95,13 +91,18 @@ export default function AdminPortal() {
 
             {/* Active Admin Profile */}
             <div className="flex items-center gap-2 rounded-xl border border-amber/40 bg-amber/10 py-1 pl-1.5 pr-2.5">
-              <Avatar user={currentUser || engine.user('u_kavita')} size={24} />
+              {currentUser && <Avatar user={currentUser} size={24} />}
               <div className="leading-tight">
-                <p className="text-[11px] font-bold text-amber">Kavita Rao</p>
-                <p className="font-mono text-[8px] uppercase tracking-widest text-dim">super_admin</p>
+                <p className="text-[11px] font-bold text-amber">{currentUser?.name || 'Kavita Rao'}</p>
+                <p className="font-mono text-[8px] uppercase tracking-widest text-dim">
+                  {currentUser?.role || 'super_admin'}
+                </p>
               </div>
               <button
-                onClick={() => { logout(); navigate('/login'); }}
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
                 className="ml-2 rounded p-1 text-dim hover:bg-night-800 hover:text-sos transition-colors"
                 title="Sign out"
               >
@@ -120,13 +121,18 @@ export default function AdminPortal() {
         <section className="mt-8">
           <div className="panel rounded-xl px-4 py-3.5">
             <div className="mb-2.5 flex items-center gap-2">
-              <span className="text-amber"><I.bolt size={14} /></span>
+              <span className="text-amber">
+                <I.bolt size={14} />
+              </span>
               <p className="font-display text-[13px] font-bold">Backend API Endpoints Under Monitoring</p>
               <span className="chip">Zod validation · JWT verified · MongoDB $geoNear</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {ENDPOINTS.map((e) => (
-                <code key={e} className="rounded-md border border-line-soft bg-night-900/70 px-2 py-1 font-mono text-[10px] text-mute hover:border-amber/40 hover:text-amber transition-colors">
+                <code
+                  key={e}
+                  className="rounded-md border border-line-soft bg-night-900/70 px-2 py-1 font-mono text-[10px] text-mute hover:border-amber/40 hover:text-amber transition-colors"
+                >
                   {e}
                 </code>
               ))}
@@ -141,32 +147,13 @@ export default function AdminPortal() {
           <span className="flex shrink-0 items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-safe">
             <span className="h-1.5 w-1.5 rounded-full bg-safe pulse-dot" /> Live Telemetry
           </span>
-          <AdminTicker />
+          <div className="relative min-w-0 flex-1 overflow-hidden">
+            <p className="font-mono text-[10px] text-dim">
+              Authoritative MongoDB connection active · Socket.io gateway online · AES-256 encrypted sessions
+            </p>
+          </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function AdminTicker() {
-  const state = useEngine();
-  const items = state.feed.slice(0, 12);
-  const line = (suffix: string) => (
-    <div className="flex shrink-0 items-center" aria-hidden={suffix === 'b'}>
-      {items.map((e) => (
-        <span key={e.id + suffix} className="flex items-center font-mono text-[10px] text-dim">
-          <span className={`mx-3 ${e.tone === 'err' ? 'text-sos' : e.tone === 'warn' ? 'text-amber' : e.tone === 'ok' ? 'text-safe' : 'text-sky'}`}>◆</span>
-          <span className={`mr-1.5 font-bold uppercase ${e.tone === 'err' ? 'text-sos/80' : e.tone === 'warn' ? 'text-amber/80' : e.tone === 'ok' ? 'text-safe/80' : 'text-sky/80'}`}>{e.kind}</span>
-          {e.text.length > 92 ? e.text.slice(0, 92) + '…' : e.text}
-        </span>
-      ))}
-    </div>
-  );
-  return (
-    <div className="relative min-w-0 flex-1 overflow-hidden">
-      <div className="flex w-max" style={{ animation: 'ticker-x 46s linear infinite' }}>
-        {line('a')}{line('b')}
-      </div>
     </div>
   );
 }

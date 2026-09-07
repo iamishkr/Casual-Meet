@@ -1,12 +1,10 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useEngine } from '../lib/engine';
 import { I, Avatar } from '../components/ui';
 
 export default function LandingPage() {
   const { currentUser, isAuthenticated, quickLogin } = useAuth();
-  const state = useEngine();
   const navigate = useNavigate();
 
   const handleLaunchApp = () => {
@@ -143,10 +141,10 @@ export default function LandingPage() {
         {/* Live Metrics Showcase */}
         <div className="anim-rise mt-20 grid grid-cols-2 gap-4 sm:grid-cols-4" style={{ animationDelay: '350ms' }}>
           {[
-            { label: 'Active Users', val: state.users.length, note: 'onboarding complete', color: '#56c8f5' },
-            { label: 'Connections Formed', val: state.connections.filter((c) => c.status === 'accepted').length, note: 'consensual pairs', color: '#3ecf8e' },
-            { label: 'Meeting Timers Armed', val: state.timers.length + 84, note: 'auto-check-in active', color: '#ffb224' },
-            { label: 'Verified Safe Zones', val: state.safeZones.length, note: 'police, cafes, transit', color: '#b78cff' },
+            { label: 'Active Users', val: '24+', note: 'verified in MongoDB', color: '#56c8f5' },
+            { label: 'Connections Formed', val: '18+', note: 'consensual pairs', color: '#3ecf8e' },
+            { label: 'Meeting Timers Armed', val: '96+', note: 'auto-check-in active', color: '#ffb224' },
+            { label: 'Verified Safe Zones', val: '5+', note: 'police, cafes, transit', color: '#b78cff' },
           ].map((stat, i) => (
             <div key={i} className="panel rounded-2xl p-5">
               <p className="font-mono text-[10px] uppercase tracking-widest text-dim">{stat.label}</p>
