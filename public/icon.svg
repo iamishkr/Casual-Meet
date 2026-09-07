@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1e2c4f" />
+      <stop offset="100%" stop-color="#0a101d" />
+    </radialGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffc74c" />
+      <stop offset="50%" stop-color="#ffb224" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <filter id="amberGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#ffb224" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Background rounded app icon frame -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGlow)" />
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#ffb224" stroke-opacity="0.25" stroke-width="6" />
+
+  <!-- Radar circles -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#2a3f68" stroke-dasharray="8 8" stroke-width="3" opacity="0.6" />
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#ffb224" stroke-width="2" opacity="0.25" />
+  <circle cx="256" cy="256" r="60" fill="none" stroke="#ffb224" stroke-width="2" opacity="0.35" />
+
+  <!-- Radar sweep ping -->
+  <circle cx="310" cy="190" r="14" fill="#38bdf8" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite" />
+  </circle>
+
+  <!-- Central Emblem: Shield with Safety Spark / Pin -->
+  <g filter="url(#amberGlow)">
+    <!-- Outer Shield Shape -->
+    <path d="M 256 120 L 356 170 C 356 280 256 360 256 380 C 256 360 156 280 156 170 Z" 
+          fill="url(#shieldGrad)" />
+    <!-- Inner Dark Shield Core -->
+    <path d="M 256 142 L 336 182 C 336 268 256 332 256 352 C 256 332 176 268 176 182 Z" 
+          fill="#0c1527" />
+    <!-- Center Bolt / Location Pin Spark -->
+    <path d="M 256 195 L 268 238 L 298 244 L 272 266 L 278 300 L 256 280 L 234 300 L 240 266 L 214 244 L 244 238 Z" 
+          fill="#ffb224" />
+  </g>
+
+  <!-- Verification Sparkle -->
+  <circle cx="256" cy="256" r="6" fill="#ffffff" />
+</svg>
