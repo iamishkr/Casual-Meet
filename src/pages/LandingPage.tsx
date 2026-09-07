@@ -99,41 +99,50 @@ export default function LandingPage() {
             PII redaction, instant SMS dispatch to emergency contacts, and a creator command center.
           </p>
 
-          <div className="anim-rise mt-10 flex flex-wrap items-center justify-center gap-4" style={{ animationDelay: '300ms' }}>
-            <button
-              onClick={handleLaunchApp}
-              className="btn-press flex items-center gap-2.5 rounded-xl bg-amber px-6 py-3.5 font-display text-sm font-bold text-night-950 shadow-[0_10px_30px_-6px_rgba(255,178,36,0.7)] hover:bg-[#ffc14d]"
+          <div className="anim-rise mt-10 flex flex-wrap items-center justify-center gap-3.5" style={{ animationDelay: '300ms' }}>
+            <Link
+              to="/app"
+              className="btn-press flex items-center gap-2 rounded-xl bg-amber px-5 py-3 font-display text-xs font-bold text-night-950 shadow-[0_10px_30px_-6px_rgba(255,178,36,0.7)] hover:bg-[#ffc14d]"
             >
-              <I.radar size={18} /> Launch User Portal
-            </button>
-            <button
-              onClick={handleLaunchAdmin}
-              className="btn-press flex items-center gap-2.5 rounded-xl border border-line-soft bg-night-850 px-6 py-3.5 font-display text-sm font-bold text-ink shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] hover:border-amber/40 hover:text-amber"
+              <I.radar size={16} /> Launch Consumer Web
+            </Link>
+            <Link
+              to="/mobile"
+              className="btn-press flex items-center gap-2 rounded-xl border border-line bg-night-850 px-5 py-3 font-display text-xs font-bold text-ink shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] hover:border-amber/40 hover:text-amber"
             >
-              <I.shield size={18} /> Creator Admin Console
-            </button>
+              <I.phone size={16} /> Launch Consumer Mobile
+            </Link>
+            <Link
+              to="/admin"
+              className="btn-press flex items-center gap-2 rounded-xl border border-line bg-night-850 px-5 py-3 font-display text-xs font-bold text-ink shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] hover:border-amber/40 hover:text-amber"
+            >
+              <I.shield size={16} /> Creator Admin Console
+            </Link>
           </div>
 
           {/* Quick tester pills */}
           <div className="anim-fade mt-6 flex flex-wrap items-center justify-center gap-2 text-[11px] text-dim" style={{ animationDelay: '400ms' }}>
             <span>Quick test logins:</span>
             <button
-              onClick={() => { quickLogin('u_aisha'); navigate('/app'); }}
+              type="button"
+              onClick={() => { quickLogin('aisha.k'); navigate('/app'); }}
               className="rounded-md border border-line-soft bg-night-850 px-2.5 py-1 text-mute hover:border-amber/40 hover:text-amber transition-colors"
             >
-              👩 Aisha (User)
+              👩 Aisha (Web)
             </button>
             <button
-              onClick={() => { quickLogin('u_rohan'); navigate('/app'); }}
+              type="button"
+              onClick={() => { quickLogin('rohan.m'); navigate('/mobile'); }}
               className="rounded-md border border-line-soft bg-night-850 px-2.5 py-1 text-mute hover:border-amber/40 hover:text-amber transition-colors"
             >
-              👨 Rohan (User)
+              👨 Rohan (Mobile)
             </button>
             <button
-              onClick={() => { quickLogin('u_kavita'); navigate('/admin'); }}
+              type="button"
+              onClick={() => { quickLogin('kavita.r'); navigate('/admin'); }}
               className="rounded-md border border-amber/30 bg-amber/10 px-2.5 py-1 font-bold text-amber hover:bg-amber/20 transition-colors"
             >
-              🛡️ Kavita (Creator / Admin)
+              🛡️ Kavita (Super Admin)
             </button>
           </div>
         </div>

@@ -88,3 +88,5 @@ export function useToast() {
   }
   return ctx;
 }
+
+export const useToasts = useToast;

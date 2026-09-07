@@ -141,14 +141,17 @@ export const Btn = ({
   );
 };
 
-export const Modal = ({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; wide?: boolean }) => {
+export const Modal = ({ open, onClose, title, description, children, wide }: { open: boolean; onClose: () => void; title?: ReactNode; description?: ReactNode; children: ReactNode; wide?: boolean }) => {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
       <div className="anim-fade absolute inset-0 bg-night-950/80 backdrop-blur-sm" onClick={onClose} />
       <div className={`anim-rise panel relative w-full ${wide ? 'max-w-2xl' : 'max-w-md'} rounded-2xl p-5`} style={{ boxShadow: 'var(--shadow-pop)' }}>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-display text-lg font-bold">{title}</h3>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            {title && <h3 className="font-display text-lg font-bold">{title}</h3>}
+            {description && <p className="mt-1 text-xs text-mute">{description}</p>}
+          </div>
           <button onClick={onClose} className="btn-press rounded-md p-1.5 text-mute hover:bg-night-750 hover:text-ink"><I.x size={16} /></button>
         </div>
         {children}
@@ -273,3 +276,15 @@ export const MiniBars = ({ data, color, height = 64 }: { data: number[]; color: 
     </div>
   );
 };
+
+// Re-export modern design system primitives
+export { Button } from './ui/Button';
+export { Input } from './ui/Input';
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/Card';
+export { BottomSheet } from './ui/BottomSheet';
+export { Tabs } from './ui/Tabs';
+export { Skeleton, SkeletonCard } from './ui/Skeleton';
+export { EmptyState } from './ui/EmptyState';
+export { ErrorState } from './ui/ErrorState';
+export { Dropdown } from './ui/Dropdown';
+export { Dialog } from './ui/Dialog';
