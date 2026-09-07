@@ -3,11 +3,11 @@ import jwt from 'jsonwebtoken';
 import { User, IUser } from '../models/User.js';
 import { Suspension } from '../models/Suspension.js';
 
+import { getJwtSecret } from '../config/jwt.js';
+
 export interface AuthRequest extends Request {
   user?: IUser;
 }
-
-const JWT_SECRET = process.env.JWT_SECRET || 'casualmeet_super_secret_production_key_2026_xyz';
 
 export async function authenticate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
@@ -18,7 +18,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
 
   const token = authHeader.split(' ')[1];
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const payload = jwt.verify(token, getJwtSecret()) as { userId: string };
     const user = await User.findById(payload.userId);
 
     if (!user) {

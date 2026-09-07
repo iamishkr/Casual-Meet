@@ -264,4 +264,15 @@ router.get('/safe-zones', async (_req: AuthRequest, res: Response): Promise<void
   }
 });
 
+// Admin: Trigger authoritative timer worker check manually
+router.post('/timers/check-expired', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { checkExpiredTimers } = await import('../workers/timerWorker.js');
+    const result = await checkExpiredTimers();
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to trigger timer check.' });
+  }
+});
+
 export default router;

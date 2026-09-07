@@ -1,8 +1,10 @@
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { Chat } from '../models/Chat.js';
 import { Message } from '../models/Message.js';
 import { scanSensitive } from '../utils/scanner.js';
+import { emitToChat, emitToUser } from '../socket.js';
 
 const router = Router();
 
@@ -24,6 +26,11 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
 router.get('/:id/messages', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(404).json({ error: 'Chat not found or access denied.' });
+      return;
+    }
+
     const chat = await Chat.findOne({
       _id: req.params.id,
       participants: user._id,
@@ -49,6 +56,11 @@ router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Respons
 
     if (!content || !content.trim()) {
       res.status(400).json({ error: 'Message content cannot be empty.' });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(404).json({ error: 'Chat not found or access denied.' });
       return;
     }
 
@@ -80,6 +92,22 @@ router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Respons
     chat.lastMessageAt = new Date();
     await chat.save();
 
+    // Real-time WebSocket emission (Post-persist)
+    emitToChat(chat._id.toString(), 'new_message', {
+      message,
+      chatId: chat._id,
+    });
+
+    for (const p of chat.participants) {
+      if (p.toString() !== user._id.toString()) {
+        emitToUser(p.toString(), 'notification', {
+          type: 'new_message',
+          chatId: chat._id,
+          sender: { id: user._id, name: user.name, username: user.username },
+        });
+      }
+    }
+
     res.status(201).json({
       message,
       flagged: containsSensitive,
@@ -90,14 +118,26 @@ router.post('/:id/messages', authenticate, async (req: AuthRequest, res: Respons
   }
 });
 
-// Reveal sensitive message
+// Reveal sensitive message (Protected against IDOR)
 router.put('/messages/:id/reveal', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
-    const msg = await Message.findById(req.params.id);
 
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(404).json({ error: 'Message not found.' });
+      return;
+    }
+
+    const msg = await Message.findById(req.params.id);
     if (!msg) {
       res.status(404).json({ error: 'Message not found.' });
+      return;
+    }
+
+    // IDOR Prevention: Verify that the authenticated user is a participant of the chat
+    const chat = await Chat.findById(msg.chatId);
+    if (!chat || !chat.participants.some((p) => p.toString() === user._id.toString())) {
+      res.status(403).json({ error: 'Access denied. You are not a participant in this conversation.' });
       return;
     }
 

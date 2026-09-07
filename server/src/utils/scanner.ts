@@ -39,4 +39,10 @@ export const normalizePhone = (p: string) => {
 
 export const isIndianNumber = (p: string) => normalizePhone(p).startsWith('+91');
 
+export const isValidPhone = (p: string): boolean => {
+  if (!p || typeof p !== 'string') return false;
+  const digits = p.replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 15;
+};
+
 export const COORD_REDACTED = '••.••••, ••.••••';

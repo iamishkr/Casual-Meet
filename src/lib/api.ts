@@ -3,7 +3,7 @@ const isCapacitor =
   (Boolean((window as any).Capacitor) || window.location.protocol === 'capacitor:');
 
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta as any).env?.VITE_API_BASE_URL ||
   (isCapacitor ? 'http://192.168.1.6:5000/api' : '/api');
 
 function getAuthHeaders(): HeadersInit {

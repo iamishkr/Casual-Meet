@@ -1,10 +1,10 @@
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { SosEvent } from '../models/SosEvent.js';
-import { SosDeliveryLog } from '../models/SosDeliveryLog.js';
-import { EmergencyContact } from '../models/EmergencyContact.js';
 import { Location } from '../models/Location.js';
-import { isIndianNumber, normalizePhone } from '../utils/scanner.js';
+import { dispatchEmergencyAlerts } from '../services/dispatchService.js';
+import { emitToAdmins, emitToUser } from '../socket.js';
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.get('/active', authenticate, async (req: AuthRequest, res: Response): Pro
   }
 });
 
-// Trigger SOS
+// Trigger SOS (Idempotent: prevents duplicate active emergencies per user)
 router.post('/trigger', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
@@ -27,7 +27,10 @@ router.post('/trigger', authenticate, async (req: AuthRequest, res: Response): P
 
     const existing = await SosEvent.findOne({ userId: user._id, status: 'active' });
     if (existing) {
-      res.status(400).json({ error: 'An SOS emergency is already active for this account.' });
+      res.status(400).json({
+        error: 'An active SOS emergency already exists for this account.',
+        activeSosId: existing._id,
+      });
       return;
     }
 
@@ -47,68 +50,85 @@ router.post('/trigger', authenticate, async (req: AuthRequest, res: Response): P
       triggeredTimerId: timerId || undefined,
     });
 
-    // Auto-dispatch alerts to emergency contacts
-    const contacts = await EmergencyContact.find({ userId: user._id, notifyOnSos: true }).limit(5);
-
-    let sentCount = 0;
-    for (const c of contacts) {
-      const gateway = isIndianNumber(c.phone) ? 'fast2sms' : 'twilio';
-      const sid = gateway === 'fast2sms' ? `F2S_${Math.random().toString(36).substring(2, 8).toUpperCase()}` : `SM${Math.random().toString(36).substring(2, 12)}`;
-
-      await SosDeliveryLog.create({
-        sosId: sos._id,
-        contactId: c._id,
-        contactName: c.name,
-        contactPhone: normalizePhone(c.phone),
-        gateway,
-        status: 'sent',
-        attempts: 1,
-        gatewayResponse: {
-          sid,
-          cost: gateway === 'fast2sms' ? '₹0.16' : '$0.0079',
-        },
-      });
-      sentCount++;
-    }
+    // Auto-dispatch alerts to emergency contacts via Dispatch Service Adapter
+    const dispatchResults = await dispatchEmergencyAlerts(sos);
+    const sentCount = dispatchResults.length;
 
     sos.smsSent = sentCount > 0;
     sos.contactsNotified = sentCount;
     sos.lastDispatchAt = new Date();
     await sos.save();
 
+    // Broadcast realtime event to Admins/Moderators and the incident owner
+    emitToAdmins('sos_triggered', {
+      sos,
+      user: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        phone: user.phone,
+        trustScore: user.trustScore,
+        isVerified: user.isVerified,
+      },
+    });
+    emitToUser(user._id.toString(), 'sos_updated', { sos });
+
     res.status(201).json({
       sos,
       contactsAlerted: sentCount,
+      dispatchDetails: dispatchResults,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to trigger SOS emergency.' });
   }
 });
 
-// Resolve SOS
-router.post('/:id/resolve', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+// Resolve SOS with Explicit Role Authorization
+// Allowed: Incident Owner, Moderator, or Super Admin
+const resolveSosHandler = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
     const { status } = req.body; // 'resolved' | 'false_alarm'
 
-    const sos = await SosEvent.findOne({
-      _id: req.params.id,
-      $or: [{ userId: user._id }, { ...(user.role === 'super_admin' ? {} : { userId: user._id }) }],
-    });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      res.status(404).json({ error: 'SOS incident not found.' });
+      return;
+    }
 
+    const sos = await SosEvent.findById(req.params.id);
     if (!sos) {
-      res.status(404).json({ error: 'SOS event not found or access denied.' });
+      res.status(404).json({ error: 'SOS incident not found.' });
+      return;
+    }
+
+    // RBAC Authorization Check
+    const isOwner = sos.userId.toString() === user._id.toString();
+    const isAdminOrMod = user.role === 'super_admin' || user.role === 'moderator';
+
+    if (!isOwner && !isAdminOrMod) {
+      res.status(403).json({
+        error: 'Access denied. You do not have permission to resolve this SOS incident.',
+      });
       return;
     }
 
     sos.status = status === 'false_alarm' ? 'false_alarm' : 'resolved';
     sos.resolvedAt = new Date();
+    sos.resolvedBy = user._id as any;
+    sos.resolvedByRole = user.role;
     await sos.save();
+
+    // Broadcast resolution event to Admins and User
+    emitToAdmins('sos_updated', { sos });
+    emitToUser(sos.userId.toString(), 'sos_updated', { sos });
 
     res.json(sos);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to resolve SOS emergency.' });
   }
-});
+};
+
+router.post('/:id/resolve', authenticate, resolveSosHandler);
+router.put('/:id/resolve', authenticate, resolveSosHandler);
 
 export default router;

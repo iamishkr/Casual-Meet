@@ -10,6 +10,8 @@ dotenv.config();
 import { connectDB } from './db.js';
 import { seedDatabase } from './seed.js';
 import { setupSocketIO } from './socket.js';
+import { validateJwtConfig } from './config/jwt.js';
+import { initTimerWorker } from './workers/timerWorker.js';
 
 // Route imports
 import authRoutes from './routes/auth.routes.js';
@@ -20,12 +22,41 @@ import timersRoutes from './routes/timers.routes.js';
 import sosRoutes from './routes/sos.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import inspectRoutes from './routes/inspect.routes.js';
+import contactsRoutes from './routes/contacts.routes.js';
+import locationRoutes from './routes/location.routes.js';
+import safeZonesRoutes from './routes/safezones.routes.js';
+import reportsRoutes from './routes/reports.routes.js';
+import verificationRoutes from './routes/verification.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors({ origin: '*' }));
+// Environment-based CORS Configuration
+const isProd = process.env.NODE_ENV === 'production';
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://192.168.1.6:3000',
+      'capacitor://localhost',
+      'http://localhost',
+    ];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, native webview)
+      if (!origin) return callback(null, true);
+      if (!isProd || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS Policy: Origin ${origin} not allowed.`));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 // Security Headers Middleware
@@ -51,7 +82,6 @@ app.get(['/', '/api'], (_req, res) => {
       login: 'http://localhost:3000/login',
     },
     endpoints: {
-      databaseInspector: '/api/admin/inspect (Requires Admin Bearer Token)',
       health: '/api/health',
       auth: '/api/auth/login',
       discover: '/api/discover',
@@ -59,7 +89,13 @@ app.get(['/', '/api'], (_req, res) => {
       chats: '/api/chats',
       timers: '/api/timers',
       sos: '/api/sos',
+      contacts: '/api/contacts',
+      location: '/api/location',
+      safeZones: '/api/safe-zones',
+      reports: '/api/reports',
+      verification: '/api/verification',
       admin: '/api/admin/metrics',
+      databaseInspector: '/api/admin/inspect (Requires Admin Bearer Token)',
     },
   });
 });
@@ -81,6 +117,11 @@ app.use('/api/connections', connectionsRoutes);
 app.use('/api/chats', chatsRoutes);
 app.use('/api/timers', timersRoutes);
 app.use('/api/sos', sosRoutes);
+app.use('/api/contacts', contactsRoutes);
+app.use('/api/location', locationRoutes);
+app.use('/api/safe-zones', safeZonesRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/verification', verificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/inspect', inspectRoutes);
 app.use('/api/inspect', inspectRoutes);
@@ -100,8 +141,14 @@ export const io = setupSocketIO(httpServer);
 // Start Server
 async function startServer() {
   try {
+    // Validate JWT configuration before bootstrapping
+    validateJwtConfig();
+
     await connectDB();
     await seedDatabase();
+
+    // Start Authoritative Server-Side Safety Timer Worker
+    initTimerWorker(5000);
 
     httpServer.listen(PORT, () => {
       console.log(`====================================================`);

@@ -7,9 +7,9 @@ import { Location } from '../models/Location.js';
 import { EmergencyContact } from '../models/EmergencyContact.js';
 import { Suspension } from '../models/Suspension.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { getJwtSecret } from '../config/jwt.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'casualmeet_super_secret_production_key_2026_xyz';
 
 // -------------------------------------------------------------
 // In-Memory Brute-Force Rate Limiting for Authentication
@@ -142,7 +142,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ userId: user._id }, getJwtSecret(), { expiresIn: '30d' });
     res.status(201).json({
       token,
       user: {
@@ -242,7 +242,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     // 7. Issue JWT Session Token
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ userId: user._id }, getJwtSecret(), { expiresIn: '30d' });
     res.json({
       token,
       user: {

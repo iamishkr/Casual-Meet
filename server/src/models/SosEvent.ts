@@ -17,6 +17,8 @@ export interface ISosEvent extends Document {
   contactsNotified: number;
   triggeredTimerId?: mongoose.Types.ObjectId;
   resolvedAt?: Date;
+  resolvedBy?: mongoose.Types.ObjectId;
+  resolvedByRole?: string;
   lastDispatchAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -40,6 +42,8 @@ const SosEventSchema = new Schema<ISosEvent>(
     contactsNotified: { type: Number, default: 0 },
     triggeredTimerId: { type: Schema.Types.ObjectId, ref: 'MeetingTimer' },
     resolvedAt: { type: Date },
+    resolvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    resolvedByRole: { type: String },
     lastDispatchAt: { type: Date },
   },
   { timestamps: true }

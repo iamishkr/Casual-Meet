@@ -19,8 +19,8 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<v
   }
 });
 
-// Arm Meeting Timer
-router.post('/start', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+// Arm Meeting Timer (Support both POST / and POST /start)
+router.post(['/', '/start'], authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
     const { durationMinutes, locationName, meetWithUserId, meetupLocation } = req.body;
@@ -35,8 +35,11 @@ router.post('/start', authenticate, async (req: AuthRequest, res: Response): Pro
       return;
     }
 
-    const duration = Math.min(Math.max(Number(durationMinutes) || 60, 15), 480);
-    const expiresAt = new Date(Date.now() + duration * 60 * 1000);
+    const isDevTestExpire = process.env.NODE_ENV !== 'production' && req.body.testExpireNow;
+    const duration = isDevTestExpire ? 15 : Math.min(Math.max(Number(durationMinutes) || 60, 15), 480);
+    const expiresAt = isDevTestExpire
+      ? new Date(Date.now() - 60 * 1000)
+      : new Date(Date.now() + duration * 60 * 1000);
 
     const timer = await MeetingTimer.create({
       userId: user._id,
@@ -55,7 +58,7 @@ router.post('/start', authenticate, async (req: AuthRequest, res: Response): Pro
   }
 });
 
-// Mark Safe
+// Mark Safe (State transition: active/extended -> safe)
 router.put('/:id/safe', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
@@ -63,6 +66,11 @@ router.put('/:id/safe', authenticate, async (req: AuthRequest, res: Response): P
 
     if (!timer) {
       res.status(404).json({ error: 'Meeting timer not found.' });
+      return;
+    }
+
+    if (timer.status !== 'active' && timer.status !== 'extended') {
+      res.status(400).json({ error: `Cannot mark timer safe; current status is '${timer.status}'.` });
       return;
     }
 
@@ -76,7 +84,7 @@ router.put('/:id/safe', authenticate, async (req: AuthRequest, res: Response): P
   }
 });
 
-// Extend Timer
+// Extend Timer (State transition: active/extended -> extended)
 router.put('/:id/extend', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
@@ -88,7 +96,12 @@ router.put('/:id/extend', authenticate, async (req: AuthRequest, res: Response):
       return;
     }
 
-    const extra = Math.min(Math.max(Number(extraMinutes) || 15, 5), 120);
+    if (timer.status !== 'active' && timer.status !== 'extended') {
+      res.status(400).json({ error: `Cannot extend timer; current status is '${timer.status}'.` });
+      return;
+    }
+
+    const extra = Math.min(Math.max(Number(req.body.extraMinutes || req.body.addMinutes) || 15, 5), 120);
     timer.durationMinutes += extra;
     timer.expiresAt = new Date(timer.expiresAt.getTime() + extra * 60 * 1000);
     timer.status = 'extended';
@@ -100,7 +113,7 @@ router.put('/:id/extend', authenticate, async (req: AuthRequest, res: Response):
   }
 });
 
-// Cancel Timer
+// Cancel Timer (State transition: active/extended -> cancelled)
 router.put('/:id/cancel', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = req.user!;
@@ -108,6 +121,11 @@ router.put('/:id/cancel', authenticate, async (req: AuthRequest, res: Response):
 
     if (!timer) {
       res.status(404).json({ error: 'Meeting timer not found.' });
+      return;
+    }
+
+    if (timer.status !== 'active' && timer.status !== 'extended') {
+      res.status(400).json({ error: `Cannot cancel timer; current status is '${timer.status}'.` });
       return;
     }
 

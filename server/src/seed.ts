@@ -93,6 +93,24 @@ export async function seedDatabase() {
     trustScore: 150,
   });
 
+  const rahul = await User.create({
+    name: 'Rahul Verma',
+    username: 'rahul.mod',
+    email: 'rahul.mod@casualmeet.app',
+    passwordHash: adminPasswordHash,
+    phone: '+919800554433',
+    city: 'Bengaluru Safety Center',
+    avatarHue: 180,
+    age: 30,
+    occupation: 'Safety Operations Specialist',
+    bio: 'Trust & Safety Moderator.',
+    interests: ['Safety', 'Cycling'],
+    lookingFor: '—',
+    role: 'moderator',
+    isVerified: true,
+    trustScore: 140,
+  });
+
   // 2. Seed Locations (Indiranagar, Koramangala, HSR)
   await Location.create([
     { userId: aisha._id, location: { type: 'Point', coordinates: [77.6412, 12.9719] } },
