@@ -1,21 +1,52 @@
 import type {
   DiscoverItem,
+  DiscoverPersonDTO,
   EmergencyContactDTO,
+  FeedResponseDTO,
+  FollowDTO,
+  MediaUploadResponseDTO,
   MeetingTimerDTO,
+  MutualConnectionDTO,
+  PostCommentDTO,
+  PostDTO,
   Relationship,
+  RelationshipDTO,
   SafeZoneDTO,
+  SearchResultDTO,
+  SocialNotificationDTO,
   SosIncidentDTO,
+  StoryDTO,
+  StoryGroupDTO,
+  StoryViewDTO,
   UserReportDTO,
   VerificationMineDTO,
+  UserProfileDTO,
+  ChatMessageDTO,
+  ConversationDTO,
+  ChatReadResponseDTO,
+  CommunityDTO,
+  CommunityMemberDTO,
+  CommunityMembershipRequestDTO,
+  CommunityFeedResponseDTO,
 } from './types';
 
-const isCapacitor =
-  typeof window !== 'undefined' &&
-  (Boolean((window as any).Capacitor) || window.location.protocol === 'capacitor:');
 
-const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL ||
-  (isCapacitor ? 'http://192.168.1.6:5000/api' : '/api');
+export const isCapacitor =
+  typeof window !== 'undefined' &&
+  (Boolean((window as any).Capacitor?.isNativePlatform?.()) ||
+   Boolean((window as any).Capacitor) ||
+   window.location.protocol === 'capacitor:' ||
+   (window.location.hostname === 'localhost' && window.location.port === ''));
+
+export function getApiBase(): string {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('casualmeet_server_url');
+    if (custom) return custom.replace(/\/api\/?$/, '') + '/api';
+  }
+  const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envBase) return envBase;
+  return isCapacitor ? 'http://10.151.192.137:5000/api' : '/api';
+}
 
 export function getAuthToken(): string | null {
   try {
@@ -43,7 +74,7 @@ function getAuthHeaders(): HeadersInit {
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = { ...getAuthHeaders(), ...(options.headers || {}) };
-  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  const res = await fetch(`${getApiBase()}${endpoint}`, { ...options, headers });
 
   if (!res.ok) {
     let errorMsg = `Request failed (${res.status})`;
@@ -95,7 +126,22 @@ export const api = {
       }),
   },
 
-  discover: (maxKm: number = 10) => request<DiscoverItem[]>(`/discover?maxKm=${maxKm}`),
+  discover: Object.assign(
+    (maxKm: number = 10) => request<DiscoverItem[]>(`/discover?maxKm=${maxKm}`),
+    {
+      nearby: (maxKm: number = 10) => request<DiscoverItem[]>(`/discover?maxKm=${maxKm}`),
+      people: (params?: { page?: number; limit?: number; interest?: string }) => {
+        const q = new URLSearchParams();
+        if (params?.page) q.append('page', String(params.page));
+        if (params?.limit) q.append('limit', String(params.limit));
+        if (params?.interest) q.append('interest', params.interest);
+        const queryStr = q.toString() ? `?${q.toString()}` : '';
+        return request<{ people: DiscoverPersonDTO[]; total: number; page: number; limit: number }>(`/discover/people${queryStr}`);
+      },
+      search: (q: string, type: 'people' | 'posts' | 'all' = 'all', limit: number = 20) =>
+        request<SearchResultDTO>(`/discover/search?q=${encodeURIComponent(q)}&type=${type}&limit=${limit}`),
+    }
+  ),
 
   location: {
     update: (latitude: number, longitude: number) =>
@@ -137,7 +183,14 @@ export const api = {
   },
 
   reports: {
-    create: (data: { reportedUserId: string; category?: string; reason: string; details?: string }) =>
+    create: (data: {
+      reportedUserId?: string;
+      targetType?: 'user' | 'post' | 'comment' | 'story';
+      targetId?: string;
+      category?: string;
+      reason: string;
+      details?: string;
+    }) =>
       request<{ success: boolean; message: string; reportId: string }>('/reports', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -160,20 +213,47 @@ export const api = {
       request<any>(`/connections/${id}/reject`, {
         method: 'PUT',
       }),
+    block: (targetUserId: string) =>
+      request<{ success: boolean; message: string }>('/connections/block', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId }),
+      }),
+    unblock: (targetUserId: string) =>
+      request<{ success: boolean; message: string; removedBlocks: number }>('/connections/unblock', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId }),
+      }),
+    remove: (id: string) =>
+      request<{ success: boolean; message: string }>(`/connections/${id}`, {
+        method: 'DELETE',
+      }),
+    removeByUser: (targetUserId: string) =>
+      request<{ success: boolean; message: string }>(`/connections/user/${targetUserId}`, {
+        method: 'DELETE',
+      }),
   },
 
+
   chats: {
-    list: () => request<any[]>('/chats'),
-    getMessages: (chatId: string) => request<any[]>(`/chats/${chatId}/messages`),
+    list: (page: number = 1, limit: number = 20) =>
+      request<ConversationDTO[]>(`/chats?page=${page}&limit=${limit}`),
+    getMessages: (chatId: string, page: number = 1, limit: number = 50) =>
+      request<ChatMessageDTO[]>(`/chats/${chatId}/messages?page=${page}&limit=${limit}`),
     sendMessage: (chatId: string, content: string, type: string = 'text') =>
-      request<{ message: any; flagged: boolean; sensitiveDetails: string[] }>(`/chats/${chatId}/messages`, {
+      request<{ message: ChatMessageDTO; flagged: boolean; sensitiveDetails: string[] }>(`/chats/${chatId}/messages`, {
         method: 'POST',
         body: JSON.stringify({ content, type }),
       }),
-    revealMessage: (messageId: string) =>
-      request<any>(`/chats/messages/${messageId}/reveal`, {
+    markRead: (chatId: string) =>
+      request<ChatReadResponseDTO>(`/chats/${chatId}/read`, {
         method: 'PUT',
       }),
+    revealMessage: (messageId: string) =>
+      request<ChatMessageDTO>(`/chats/messages/${messageId}/reveal`, {
+        method: 'PUT',
+      }),
+    getWithUser: (userId: string) =>
+      request<ConversationDTO>(`/chats/with/${userId}`),
   },
 
   timers: {
@@ -252,4 +332,205 @@ export const api = {
         body: JSON.stringify(zone),
       }),
   },
+
+  posts: {
+    create: (data: { caption?: string; media?: any[]; visibility?: string; locationName?: string }) =>
+      request<PostDTO>('/posts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    get: (id: string) => request<PostDTO>(`/posts/${id}`),
+    update: (id: string, data: { caption?: string; visibility?: string }) =>
+      request<PostDTO>(`/posts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean; message: string }>(`/posts/${id}`, {
+        method: 'DELETE',
+      }),
+    like: (id: string) =>
+      request<{ success: boolean; liked: boolean; likeCount: number }>(`/posts/${id}/like`, {
+        method: 'POST',
+      }),
+    unlike: (id: string) =>
+      request<{ success: boolean; liked: boolean; likeCount: number }>(`/posts/${id}/like`, {
+        method: 'DELETE',
+      }),
+    getLikes: (id: string, page: number = 1, limit: number = 20) =>
+      request<{ likes: any[]; page: number; limit: number }>(`/posts/${id}/likes?page=${page}&limit=${limit}`),
+    addComment: (id: string, text: string) =>
+      request<PostCommentDTO>(`/posts/${id}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }),
+    getComments: (id: string, page: number = 1, limit: number = 20) =>
+      request<{ comments: PostCommentDTO[]; total: number; page: number; limit: number }>(
+        `/posts/${id}/comments?page=${page}&limit=${limit}`
+      ),
+    editComment: (commentId: string, text: string) =>
+      request<PostCommentDTO>(`/posts/comments/${commentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ text }),
+      }),
+    deleteComment: (commentId: string) =>
+      request<{ success: boolean; message: string }>(`/posts/comments/${commentId}`, {
+        method: 'DELETE',
+      }),
+  },
+
+  feed: {
+    get: (params: { limit?: number; cursor?: string; scope?: string } = {}) => {
+      const query = new URLSearchParams();
+      if (params.limit) query.set('limit', String(params.limit));
+      if (params.cursor) query.set('cursor', params.cursor);
+      if (params.scope) query.set('scope', params.scope);
+      const qs = query.toString();
+      return request<FeedResponseDTO>(`/feed${qs ? `?${qs}` : ''}`);
+    },
+  },
+
+  social: {
+    follow: (userId: string) =>
+      request<{ success: boolean; following: boolean; message: string }>(`/users/${userId}/follow`, {
+        method: 'POST',
+      }),
+    unfollow: (userId: string) =>
+      request<{ success: boolean; following: boolean; message: string }>(`/users/${userId}/follow`, {
+        method: 'DELETE',
+      }),
+    getFollowers: (userId: string, page: number = 1, limit: number = 20) =>
+      request<{ followers: FollowDTO[]; total: number; page: number; limit: number }>(
+        `/users/${userId}/followers?page=${page}&limit=${limit}`
+      ),
+    getFollowing: (userId: string, page: number = 1, limit: number = 20) =>
+      request<{ following: FollowDTO[]; total: number; page: number; limit: number }>(
+        `/users/${userId}/following?page=${page}&limit=${limit}`
+      ),
+    getMutualConnections: (userId: string, page: number = 1, limit: number = 20) =>
+      request<{ mutualConnections: MutualConnectionDTO[]; total: number; page: number; limit: number }>(
+        `/users/${userId}/mutual-connections?page=${page}&limit=${limit}`
+      ),
+    getRelationship: (userId: string) =>
+
+      request<RelationshipDTO>(`/users/${userId}/relationship`),
+    getProfile: (userId: string) =>
+      request<UserProfileDTO>(`/users/${userId}/profile`),
+    getUserPosts: (userId: string, page: number = 1, limit: number = 20) =>
+      request<{ posts: PostDTO[]; total: number; page: number; limit: number }>(
+        `/users/${userId}/posts?page=${page}&limit=${limit}`
+      ),
+  },
+
+  stories: {
+    create: (data: { media: { storageKey: string; duration?: number }; caption?: string; visibility?: string }) =>
+      request<StoryDTO>('/stories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    list: () => request<StoryGroupDTO[]>('/stories'),
+    get: (id: string) => request<StoryDTO>(`/stories/${id}`),
+    view: (id: string) =>
+      request<{ success: boolean; viewed: boolean }>(`/stories/${id}/view`, {
+        method: 'POST',
+      }),
+    getViews: (id: string) =>
+      request<{ storyId: string; totalViews: number; views: StoryViewDTO[] }>(`/stories/${id}/views`),
+    delete: (id: string) =>
+      request<{ success: boolean; message: string }>(`/stories/${id}`, {
+        method: 'DELETE',
+      }),
+  },
+
+  notifications: {
+    list: (page: number = 1, limit: number = 20) =>
+      request<{ notifications: SocialNotificationDTO[]; unreadCount: number; total: number; page: number; limit: number }>(
+        `/notifications?page=${page}&limit=${limit}`
+      ),
+    markRead: (id: string) =>
+      request<{ success: boolean; message: string }>(`/notifications/${id}/read`, {
+        method: 'PUT',
+      }),
+    markAllRead: () =>
+      request<{ success: boolean; updatedCount: number }>('/notifications/read-all', {
+        method: 'PUT',
+      }),
+  },
+
+  media: {
+    upload: (fileBase64: string, filename?: string) =>
+      request<MediaUploadResponseDTO>('/media/upload', {
+        method: 'POST',
+        body: JSON.stringify({ fileBase64, filename }),
+      }),
+  },
+
+  communities: {
+    create: (data: { name: string; description?: string; privacy?: 'public' | 'private'; avatar?: string; coverImage?: string }) =>
+      request<CommunityDTO>('/communities', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    list: (query?: string, privacy?: string, page: number = 1, limit: number = 20) => {
+      const params = new URLSearchParams();
+      if (query) params.append('query', query);
+      if (privacy) params.append('privacy', privacy);
+      params.append('page', String(page));
+      params.append('limit', String(limit));
+      return request<{ communities: CommunityDTO[]; total: number; page: number; limit: number }>(
+        `/communities?${params.toString()}`
+      );
+    },
+    my: (page: number = 1, limit: number = 20) =>
+      request<{ communities: CommunityDTO[]; total: number; page: number; limit: number }>(
+        `/communities/my?page=${page}&limit=${limit}`
+      ),
+    get: (id: string) => request<CommunityDTO>(`/communities/${id}`),
+    update: (id: string, data: Partial<{ name: string; description: string; privacy: 'public' | 'private'; avatar: string; coverImage: string }>) =>
+      request<CommunityDTO>(`/communities/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    join: (id: string) =>
+      request<{ message: string; membership: any; community: CommunityDTO }>(`/communities/${id}/join`, {
+        method: 'POST',
+      }),
+    leave: (id: string) =>
+      request<{ success: boolean; message: string }>(`/communities/${id}/leave`, {
+        method: 'DELETE',
+      }),
+    getMembers: (id: string, page: number = 1, limit: number = 20) =>
+      request<{ members: CommunityMemberDTO[]; total: number; page: number; limit: number }>(
+        `/communities/${id}/members?page=${page}&limit=${limit}`
+      ),
+    getRequests: (id: string, page: number = 1, limit: number = 20) =>
+      request<{ requests: CommunityMembershipRequestDTO[]; total: number; page: number; limit: number }>(
+        `/communities/${id}/membership-requests?page=${page}&limit=${limit}`
+      ),
+    approveRequest: (id: string, targetUserId: string) =>
+      request<{ success: boolean; message: string }>(`/communities/${id}/membership-requests/${targetUserId}/approve`, {
+        method: 'POST',
+      }),
+    rejectRequest: (id: string, targetUserId: string) =>
+      request<{ success: boolean; message: string }>(`/communities/${id}/membership-requests/${targetUserId}/reject`, {
+        method: 'POST',
+      }),
+    updateRole: (id: string, targetUserId: string, role: 'admin' | 'member') =>
+      request<{ success: boolean; message: string }>(`/communities/${id}/members/${targetUserId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      }),
+    removeMember: (id: string, targetUserId: string) =>
+      request<{ success: boolean; message: string }>(`/communities/${id}/members/${targetUserId}`, {
+        method: 'DELETE',
+      }),
+    getPosts: (id: string, page: number = 1, limit: number = 20) =>
+      request<CommunityFeedResponseDTO>(`/communities/${id}/posts?page=${page}&limit=${limit}`),
+    createPost: (id: string, data: { caption?: string; media?: any[]; locationName?: string }) =>
+      request<PostDTO>(`/communities/${id}/posts`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
 };
+

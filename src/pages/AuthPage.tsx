@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { I, Field, inputCls } from '../components/ui';
+import { getApiBase } from '../lib/api';
 import {
   Eye,
   EyeOff,
@@ -19,6 +20,9 @@ import {
   ShieldAlert,
   Clock,
   HelpCircle,
+  Settings,
+  Wifi,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'login' | 'register' }) {
@@ -41,6 +45,45 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
 
   const { login, register, forgotPassword, resetPassword, quickLogin } = useAuth();
   const navigate = useNavigate();
+
+  // Server Connection Configuration State
+  const [serverUrlInput, setServerUrlInput] = useState(() => {
+    return localStorage.getItem('casualmeet_server_url') || getApiBase().replace(/\/api\/?$/, '');
+  });
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [testResult, setTestResult] = useState<{ status: 'idle' | 'testing' | 'success' | 'failed'; msg?: string }>({ status: 'idle' });
+
+  const handleTestServer = async (testUrl: string) => {
+    setTestResult({ status: 'testing' });
+    try {
+      const cleanUrl = testUrl.trim().replace(/\/api\/?$/, '');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(`${cleanUrl}/api/health`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        setTestResult({ status: 'success', msg: 'Connected successfully to backend!' });
+      } else {
+        setTestResult({ status: 'failed', msg: `Server responded with HTTP ${res.status}` });
+      }
+    } catch (err: any) {
+      setTestResult({
+        status: 'failed',
+        msg: err.name === 'AbortError' ? 'Timed out (Firewall blocking port 5000 or wrong IP)' : (err.message || 'Cannot reach server'),
+      });
+    }
+  };
+
+  const handleSaveServer = (newUrl: string) => {
+    const cleanUrl = newUrl.trim().replace(/\/api\/?$/, '');
+    localStorage.setItem('casualmeet_server_url', cleanUrl);
+    setServerUrlInput(cleanUrl);
+    setSuccessNotice(`Server URL saved: ${cleanUrl}`);
+    setShowServerConfig(false);
+    setTimeout(() => {
+      window.location.reload();
+    }, 400);
+  };
 
   // Login form state
   const [identifier, setIdentifier] = useState('');
@@ -138,7 +181,11 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
     if (res.ok) {
       navigate(activeTab === 'admin' ? '/admin' : '/app');
     } else {
-      const err = res.error || 'Login failed';
+      let err = res.error || 'Login failed';
+      if (/failed to fetch/i.test(err)) {
+        err = 'Cannot reach backend server. Tap "Change IP" in the Server Connection bar below to verify your connection.';
+        setShowServerConfig(true);
+      }
       setError(err);
 
       // Check if error contains rate-limit wait time
@@ -190,7 +237,12 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
     if (res.ok) {
       navigate('/app');
     } else {
-      setError(res.error || 'Registration failed');
+      let err = res.error || 'Registration failed';
+      if (/failed to fetch/i.test(err)) {
+        err = 'Cannot reach backend server. Tap "Change IP" in the Server Connection bar below to verify your connection.';
+        setShowServerConfig(true);
+      }
+      setError(err);
     }
   };
 
@@ -342,6 +394,78 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
                 🛡️ Creator Admin
               </button>
             </div>
+          </div>
+
+          {/* Server Connection Bar */}
+          <div className="mb-5 rounded-xl border border-line-soft bg-night-900/60 p-2.5 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-dim font-mono text-[11px] truncate">
+                <Wifi size={13} className="text-amber shrink-0" />
+                <span className="truncate">Server: <strong className="text-ink">{serverUrlInput}</strong></span>
+              </div>
+              <button
+                type="button"
+                id="btn-toggle-server-config"
+                onClick={() => {
+                  setShowServerConfig(!showServerConfig);
+                  setTestResult({ status: 'idle' });
+                }}
+                className="ml-2 shrink-0 flex items-center gap-1 text-[11px] font-bold text-amber hover:underline"
+              >
+                <Settings size={12} /> {showServerConfig ? 'Close' : 'Change IP'}
+              </button>
+            </div>
+
+            {showServerConfig && (
+              <div className="mt-3 border-t border-line-soft pt-3 space-y-2.5">
+                <p className="text-[11px] text-mute">
+                  If running on a mobile phone, verify or update your computer's Wi-Fi IP address:
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={serverUrlInput}
+                    onChange={(e) => setServerUrlInput(e.target.value)}
+                    placeholder="e.g. http://10.151.192.137:5000"
+                    className="flex-1 rounded-lg border border-line bg-night-950 px-2.5 py-1.5 font-mono text-xs text-ink focus:border-amber focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleTestServer(serverUrlInput)}
+                    disabled={testResult.status === 'testing'}
+                    className="btn-press flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-bold text-ink hover:bg-night-800 disabled:opacity-50"
+                  >
+                    <RefreshCw size={11} className={testResult.status === 'testing' ? 'animate-spin' : ''} /> Test
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveServer(serverUrlInput)}
+                    className="btn-press rounded-lg bg-amber px-3 py-1.5 font-display text-[11px] font-extrabold text-night-950 hover:bg-[#ffc14d]"
+                  >
+                    Save
+                  </button>
+                </div>
+
+                {testResult.status === 'testing' && (
+                  <div className="text-[11px] text-amber flex items-center gap-1.5 animate-pulse">
+                    <RefreshCw size={11} className="animate-spin" /> Pinging {serverUrlInput}/api/health...
+                  </div>
+                )}
+                {testResult.status === 'success' && (
+                  <div className="rounded-lg bg-safe/15 border border-safe/40 p-2 text-[11px] text-safe font-medium">
+                    ✅ {testResult.msg}
+                  </div>
+                )}
+                {testResult.status === 'failed' && (
+                  <div className="rounded-lg bg-sos/15 border border-sos/40 p-2 text-[11px] text-sos">
+                    <p className="font-bold">❌ {testResult.msg}</p>
+                    <p className="mt-1 text-[10px] text-mute">
+                      Tips: Make sure phone and PC are on the same Wi-Fi network, and port 5000 is permitted in Windows Firewall.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Rate-Limit Cooldown Banner */}

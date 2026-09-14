@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'CasualMeet',
   webDir: 'dist',
   server: {
-    androidScheme: 'http',
+    androidScheme: 'https',
     cleartext: true,
   },
 };

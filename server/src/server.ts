@@ -4,7 +4,14 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
-// Load environment variables
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables (supports root and server folder execution)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
 import { connectDB } from './db.js';
@@ -27,6 +34,14 @@ import locationRoutes from './routes/location.routes.js';
 import safeZonesRoutes from './routes/safezones.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import verificationRoutes from './routes/verification.routes.js';
+import postsRoutes from './routes/posts.routes.js';
+import feedRoutes from './routes/feed.routes.js';
+import socialRoutes from './routes/social.routes.js';
+import storiesRoutes from './routes/stories.routes.js';
+import notificationsRoutes from './routes/notifications.routes.js';
+import mediaRoutes from './routes/media.routes.js';
+import commentsRoutes from './routes/comments.routes.js';
+import communitiesRoutes from './routes/communities.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,14 +56,29 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'http://192.168.1.6:3000',
       'capacitor://localhost',
       'http://localhost',
+      'https://localhost',
     ];
+
+function isOriginAllowed(origin: string): boolean {
+  if (!isProd) return true;
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return true;
+  if (
+    origin.endsWith('.vercel.app') ||
+    origin.endsWith('.onrender.com') ||
+    origin === 'capacitor://localhost' ||
+    origin === 'https://localhost' ||
+    origin === 'http://localhost'
+  ) {
+    return true;
+  }
+  return false;
+}
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. mobile apps, curl, native webview)
-      if (!origin) return callback(null, true);
-      if (!isProd || allowedOrigins.includes(origin)) {
+      if (!origin || isOriginAllowed(origin)) {
         return callback(null, true);
       }
       return callback(new Error(`CORS Policy: Origin ${origin} not allowed.`));
@@ -57,7 +87,7 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 
 // Security Headers Middleware
 app.use((_req, res, next) => {
@@ -94,6 +124,13 @@ app.get(['/', '/api'], (_req, res) => {
       safeZones: '/api/safe-zones',
       reports: '/api/reports',
       verification: '/api/verification',
+      posts: '/api/posts',
+      feed: '/api/feed',
+      users: '/api/users',
+      communities: '/api/communities',
+      stories: '/api/stories',
+      notifications: '/api/notifications',
+      media: '/api/media/upload',
       admin: '/api/admin/metrics',
       databaseInspector: '/api/admin/inspect (Requires Admin Bearer Token)',
     },
@@ -122,6 +159,14 @@ app.use('/api/location', locationRoutes);
 app.use('/api/safe-zones', safeZonesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/verification', verificationRoutes);
+app.use('/api/posts', postsRoutes);
+app.use('/api/feed', feedRoutes);
+app.use('/api/users', socialRoutes);
+app.use('/api/communities', communitiesRoutes);
+app.use('/api/stories', storiesRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/comments', commentsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/inspect', inspectRoutes);
 app.use('/api/inspect', inspectRoutes);
@@ -157,6 +202,13 @@ async function startServer() {
       console.log(`📡 WebSocket Gateway: ws://localhost:${PORT}`);
       console.log(`====================================================`);
     });
+
+    const cleanup = () => {
+      httpServer.close();
+      process.exit(0);
+    };
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
   } catch (err) {
     console.error('Fatal error starting server:', err);
     process.exit(1);

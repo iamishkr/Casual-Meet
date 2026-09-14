@@ -1,17 +1,17 @@
 import { io, Socket } from 'socket.io-client';
-import { getAuthToken } from './api';
+import { getAuthToken, isCapacitor } from './api';
 
-const isCapacitor =
-  typeof window !== 'undefined' &&
-  (Boolean((window as any).Capacitor) || window.location.protocol === 'capacitor:');
-
-const SOCKET_URL =
-  (import.meta as any).env?.VITE_SOCKET_URL ||
-  ((import.meta as any).env?.VITE_API_BASE_URL
-    ? (import.meta as any).env.VITE_API_BASE_URL.replace(/\/api\/?$/, '')
-    : isCapacitor
-    ? 'http://192.168.1.6:5000'
-    : 'http://localhost:5000');
+export function getSocketUrl(): string {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('casualmeet_server_url');
+    if (custom) return custom.replace(/\/api\/?$/, '');
+  }
+  const envSocket = (import.meta as any).env?.VITE_SOCKET_URL;
+  if (envSocket) return envSocket;
+  const envApi = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envApi) return envApi.replace(/\/api\/?$/, '');
+  return isCapacitor ? 'http://10.151.192.137:5000' : 'http://localhost:5000';
+}
 
 let socket: Socket | null = null;
 
@@ -30,7 +30,7 @@ export function connectSocket(overrideToken?: string): Socket {
     socket = null;
   }
 
-  socket = io(SOCKET_URL, {
+  socket = io(getSocketUrl(), {
     auth: {
       token: token || '',
     },
@@ -75,5 +75,11 @@ export function leaveChatRoom(chatId: string): void {
 export function emitTyping(chatId: string, targetUserId: string, typing: boolean): void {
   if (socket && socket.connected) {
     socket.emit(typing ? 'typing.start' : 'typing.stop', { chatId, targetUserId });
+  }
+}
+
+export function emitChatRead(chatId: string): void {
+  if (socket && socket.connected && chatId) {
+    socket.emit('chat.read', { chatId });
   }
 }

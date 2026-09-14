@@ -3,9 +3,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 export type ReportStatus = 'pending' | 'actioned' | 'dismissed';
 export type ReportOutcome = 'user_suspended' | 'warning_issued' | 'false_report';
 
+export type ReportTargetType = 'user' | 'post' | 'comment' | 'story' | 'community';
+
 export interface IUserReport extends Document {
   reporterId: mongoose.Types.ObjectId;
   reportedUserId: mongoose.Types.ObjectId;
+  targetType?: ReportTargetType;
+  targetId?: mongoose.Types.ObjectId;
   reason: string;
   details: string;
   status: ReportStatus;
@@ -21,6 +25,8 @@ const UserReportSchema = new Schema<IUserReport>(
   {
     reporterId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     reportedUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    targetType: { type: String, enum: ['user', 'post', 'comment', 'story', 'community'], default: 'user', index: true },
+    targetId: { type: Schema.Types.ObjectId, index: true },
     reason: { type: String, required: true },
     details: { type: String, default: '' },
     status: { type: String, enum: ['pending', 'actioned', 'dismissed'], default: 'pending' },

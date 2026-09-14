@@ -15,8 +15,8 @@ export default function MobileLayout({ children }: MobileLayoutProps) {
       {/* Mobile Sticky Top Header */}
       <MobileHeader />
 
-      {/* Main Viewport Container */}
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 pb-28">
+      {/* Main Viewport Container - Full Available Viewport Width */}
+      <main className="w-full flex-1 px-3 py-3 pb-24 overflow-x-hidden">
         {children}
       </main>
 

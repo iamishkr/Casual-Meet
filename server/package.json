@@ -8,8 +8,14 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:phase3c6": "tsx test-phase3c6-communities.ts",
+    "test:phase3c5": "tsx test-phase3c5-messaging.ts",
+    "test:phase3c4": "tsx test-phase3c4-discovery.ts",
+    "test:phase3c3": "tsx test-phase3c3-integration.ts",
+    "test:phase3b": "tsx test-phase3b-social.ts"
   },
+
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

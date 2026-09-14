@@ -1,7 +1,11 @@
-/**
- * Centralized JWT Configuration & Startup Validation
- * Enforces production security: fails fast if JWT_SECRET is unset in production.
- */
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
 
 const DEV_FALLBACK_SECRET = 'casualmeet_insecure_dev_jwt_secret_do_not_use_in_prod';
 

@@ -7,6 +7,8 @@ import WebMessagesPage from './pages/WebMessagesPage';
 import WebSafetyPage from './pages/WebSafetyPage';
 import WebProfilePage from './pages/WebProfilePage';
 import WebNotificationsPage from './pages/WebNotificationsPage';
+import WebCommunitiesPage from './pages/WebCommunitiesPage';
+import WebCommunityDetailPage from './pages/WebCommunityDetailPage';
 
 export default function WebApp() {
   return (
@@ -14,9 +16,12 @@ export default function WebApp() {
       <Routes>
         <Route path="/" element={<WebHomePage />} />
         <Route path="/discover" element={<WebDiscoverPage />} />
+        <Route path="/communities" element={<WebCommunitiesPage />} />
+        <Route path="/communities/:id" element={<WebCommunityDetailPage />} />
         <Route path="/messages" element={<WebMessagesPage />} />
         <Route path="/safety" element={<WebSafetyPage />} />
         <Route path="/profile" element={<WebProfilePage />} />
+        <Route path="/profile/:userId" element={<WebProfilePage />} />
         <Route path="/notifications" element={<WebNotificationsPage />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Routes>

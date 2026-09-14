@@ -2,6 +2,7 @@ import { MeetingTimer } from '../models/MeetingTimer.js';
 import { SosEvent } from '../models/SosEvent.js';
 import { dispatchEmergencyAlerts } from '../services/dispatchService.js';
 import { emitToUser, emitToAdmins } from '../socket.js';
+import { sendNotification } from '../services/notificationService.js';
 
 let intervalId: NodeJS.Timeout | null = null;
 let isRunning = false;
@@ -99,6 +100,17 @@ export async function checkExpiredTimers(): Promise<{ processedCount: number; so
 
       emitToUser(timer.userId.toString(), 'sos_triggered', sos);
       emitToAdmins('sos_triggered', sos);
+
+      // Persist unified safety notification
+      await sendNotification({
+        recipientId: timer.userId,
+        actor: { _id: timer.userId, name: 'CasualMeet Safety Engine', username: 'safety' },
+        type: 'safety_timer',
+        title: 'Safety Timer Expired',
+        message: `Your meeting safety timer for "${timer.locationName || 'Meetup'}" has expired. Emergency escalation initiated.`,
+        targetType: 'user',
+        targetId: timer.userId,
+      });
     }
   } catch (err: any) {
     console.error('[TimerWorker] Error in timer check cycle:', err.message);

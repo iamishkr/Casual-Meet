@@ -1,6 +1,9 @@
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { MeetingTimer } from '../models/MeetingTimer.js';
+import { User } from '../models/User.js';
+import { isBlocked, isConnected } from '../utils/socialAuth.js';
 
 const router = Router();
 
@@ -33,6 +36,38 @@ router.post(['/', '/start'], authenticate, async (req: AuthRequest, res: Respons
     if (active) {
       res.status(400).json({ error: 'A meeting timer is already currently active.' });
       return;
+    }
+
+    // Authoritative Meetup Partner Verification (Directives #2, #4, #5)
+    if (meetWithUserId) {
+      if (!mongoose.Types.ObjectId.isValid(meetWithUserId)) {
+        res.status(400).json({ error: 'Invalid meetWithUserId format.' });
+        return;
+      }
+
+      if (meetWithUserId === user._id.toString()) {
+        res.status(400).json({ error: 'Cannot initiate a meeting timer with yourself.' });
+        return;
+      }
+
+      const targetUser = await User.findById(meetWithUserId);
+      if (!targetUser) {
+        res.status(404).json({ error: 'Meetup partner not found.' });
+        return;
+      }
+
+      // Check block relationship (bidirectional)
+      if (await isBlocked(user._id, meetWithUserId)) {
+        res.status(403).json({ error: 'Cannot initiate a meetup with a blocked user.' });
+        return;
+      }
+
+      // Enforce connection requirement: only accepted connections may be met
+      const connected = await isConnected(user._id, meetWithUserId);
+      if (!connected) {
+        res.status(403).json({ error: 'Meetups can only be initiated with accepted connections.' });
+        return;
+      }
     }
 
     const isDevTestExpire = process.env.NODE_ENV !== 'production' && req.body.testExpireNow;

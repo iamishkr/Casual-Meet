@@ -196,7 +196,7 @@ export default function DiscoverScreen({ goChat }: { goChat: (userId: string) =>
                         <I.pin size={10} />
                         {fmtDistance(distanceKm)} away
                       </span>
-                      <span className="chip">trust {user.trustScore}</span>
+                      {user.isVerified && <span className="chip text-safe">verified</span>}
                       {user.interests?.slice(0, 2).map((t) => (
                         <span key={t} className="chip">
                           {t}

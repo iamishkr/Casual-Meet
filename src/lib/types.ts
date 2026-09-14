@@ -213,8 +213,68 @@ export interface DiscoverUser {
   interests: string[];
   avatarHue: number;
   isVerified: boolean;
-  trustScore: number;
   age?: number;
+}
+
+export interface DiscoverPersonDTO {
+  id: string;
+  name: string;
+  username: string;
+  bio?: string;
+  city?: string;
+  occupation?: string;
+  interests: string[];
+  avatarHue: number;
+  isVerified: boolean;
+  sharedInterests: string[];
+  mutualConnectionsCount: number;
+  explanations: string[];
+  relationship: {
+    isFollowing: boolean;
+    isFollower: boolean;
+    connectionStatus: 'none' | 'pending' | 'connected';
+  };
+}
+
+export interface MutualConnectionDTO {
+  id: string;
+  name: string;
+  username: string;
+  avatarHue: number;
+  isVerified: boolean;
+  city?: string;
+}
+
+export interface SearchResultDTO {
+  query: string;
+  people: {
+    id: string;
+    name: string;
+    username: string;
+    bio?: string;
+    city?: string;
+    occupation?: string;
+    interests: string[];
+    avatarHue: number;
+    isVerified: boolean;
+  }[];
+  posts: {
+    id: string;
+    caption: string;
+    media: PostMediaDTO[];
+    locationName?: string;
+
+    likeCount: number;
+    commentCount: number;
+    createdAt: string;
+    author: {
+      id: string;
+      name: string;
+      username: string;
+      avatarHue: number;
+      isVerified: boolean;
+    } | null;
+  }[];
 }
 
 export interface DiscoverItem {
@@ -227,6 +287,7 @@ export interface DiscoverItem {
     direction: 'in' | 'out';
   } | null;
 }
+
 
 export interface SafeZoneDTO {
   id: string;
@@ -303,3 +364,288 @@ export interface SosIncidentDTO {
   resolvedAt?: string;
   triggeredTimerId?: string;
 }
+
+/* ===================================================
+   PHASE 3B — SOCIAL MEDIA CORE BACKEND DTO CONTRACTS
+   =================================================== */
+
+export type PostVisibility = 'public' | 'followers' | 'connections' | 'private';
+export type ModerationStatus = 'visible' | 'flagged' | 'hidden';
+export type StoryVisibility = 'public' | 'followers' | 'connections';
+
+export interface PostMediaDTO {
+  url: string;
+  storageKey: string;
+  mediaType: 'image' | 'video';
+  width?: number;
+  height?: number;
+  duration?: number;
+  thumbnail?: string;
+}
+
+export interface PostDTO {
+  id: string;
+  communityId?: string;
+  author: {
+    _id: string;
+    name: string;
+    username: string;
+    avatarHue: number;
+    isVerified: boolean;
+    trustScore: number;
+    city?: string;
+    bio?: string;
+    occupation?: string;
+  };
+  caption: string;
+  media: PostMediaDTO[];
+  visibility: PostVisibility;
+  locationName?: string;
+  likeCount: number;
+  commentCount: number;
+  isLiked: boolean;
+  isEdited: boolean;
+  editedAt?: string;
+  moderationStatus: ModerationStatus;
+  createdAt: string;
+}
+
+export interface PostCommentDTO {
+  id: string;
+  postId: string;
+  author: {
+    _id: string;
+    name: string;
+    username: string;
+    avatarHue: number;
+    isVerified: boolean;
+    trustScore: number;
+  };
+  text: string;
+  isEdited: boolean;
+  editedAt?: string;
+  createdAt: string;
+}
+
+export interface StoryDTO {
+  id: string;
+  author: {
+    _id: string;
+    name: string;
+    username: string;
+    avatarHue: number;
+    isVerified: boolean;
+    trustScore: number;
+  };
+  media: PostMediaDTO;
+  caption?: string;
+  visibility: StoryVisibility;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface StoryGroupDTO {
+  user: {
+    _id: string;
+    name: string;
+    username: string;
+    avatarHue: number;
+    isVerified: boolean;
+    trustScore: number;
+  };
+  stories: StoryDTO[];
+}
+
+export interface StoryViewDTO {
+  viewer: {
+    _id: string;
+    name: string;
+    username: string;
+    avatarHue: number;
+    isVerified: boolean;
+    trustScore: number;
+  };
+  viewedAt: string;
+}
+
+export interface FollowDTO {
+  user: {
+    _id: string;
+    name: string;
+    username: string;
+    avatarHue: number;
+    isVerified: boolean;
+    trustScore: number;
+  };
+  followedAt: string;
+}
+
+export interface RelationshipDTO {
+  userId?: string;
+  isFollowing: boolean;
+  isFollowedBy: boolean;
+  connectionStatus: ConnStatus | 'none' | 'connected';
+  isBlocked: boolean;
+  canMessage?: boolean;
+  canMeet?: boolean;
+}
+
+export interface UserProfileDTO {
+  _id: string;
+  id?: string;
+  name: string;
+  username: string;
+  avatarHue?: number;
+  isVerified: boolean;
+  city?: string;
+  bio?: string;
+  occupation?: string;
+  interests?: string[];
+  lookingFor?: string[] | string;
+  createdAt?: string;
+  postsCount: number;
+  followersCount: number;
+  followingCount: number;
+  mutualConnectionsCount: number;
+  relationship: RelationshipDTO;
+}
+
+export interface FeedResponseDTO {
+  items: PostDTO[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface SocialNotificationDTO {
+  id: string;
+  type: string;
+  actor: {
+    id: string;
+    name: string;
+    username: string;
+  };
+  targetType?: string;
+  targetId?: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface MediaUploadResponseDTO {
+  storageKey: string;
+  url: string;
+  mediaType: 'image' | 'video';
+  mimeType: string;
+  sizeBytes: number;
+}
+
+export interface ChatMessageDTO {
+  _id: string;
+  chatId: string;
+  senderId: string;
+  content: string;
+  type: 'text' | 'image' | 'location';
+  containsSensitive: boolean;
+  sensitiveKinds?: string[];
+  revealedBy?: string[];
+  status: 'sent' | 'delivered' | 'read';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationParticipantDTO {
+  _id: string;
+  name: string;
+  username: string;
+  avatarHue?: number;
+  isVerified?: boolean;
+  city?: string;
+}
+
+export interface ConversationDTO {
+  _id: string;
+  type: 'direct' | 'group';
+  name?: string;
+  participants: (string | ConversationParticipantDTO)[];
+  otherUser?: ConversationParticipantDTO | null;
+  lastMessage?: {
+    _id: string;
+    chatId: string;
+    senderId: string;
+    content: string;
+    type: 'text' | 'image' | 'location';
+    containsSensitive: boolean;
+    status: 'sent' | 'delivered' | 'read';
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  lastMessageAt: string;
+  unreadCount: number;
+  relationship?: {
+    connectionStatus: 'none' | 'pending' | 'accepted';
+    canMeet: boolean;
+    isFollowing: boolean;
+    isFollower: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatReadResponseDTO {
+  success: boolean;
+  chatId: string;
+  readCount: number;
+}
+
+export interface SafeUserDTO {
+  id: string;
+  name: string;
+  username: string;
+  avatarHue?: number;
+  isVerified?: boolean;
+  city?: string;
+  bio?: string;
+  occupation?: string;
+}
+
+export interface CommunityDTO {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  avatar?: string;
+  coverImage?: string;
+  ownerId: string;
+  privacy: 'public' | 'private';
+  status: 'active' | 'suspended';
+  memberCount: number;
+  postCount: number;
+  createdAt: string;
+  updatedAt: string;
+  isMember: boolean;
+  userRole?: 'owner' | 'admin' | 'member';
+  membershipStatus: 'active' | 'pending' | 'none';
+}
+
+export interface CommunityMemberDTO {
+  id: string;
+  user: SafeUserDTO;
+  role: 'owner' | 'admin' | 'member';
+  joinedAt: string;
+}
+
+export interface CommunityMembershipRequestDTO {
+  id: string;
+  user: SafeUserDTO;
+  requestedAt: string;
+}
+
+export interface CommunityFeedResponseDTO {
+  posts: PostDTO[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+

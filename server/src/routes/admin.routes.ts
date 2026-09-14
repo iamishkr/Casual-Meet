@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import mongoose from 'mongoose';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { SosEvent } from '../models/SosEvent.js';
 import { SosDeliveryLog } from '../models/SosDeliveryLog.js';
@@ -11,6 +12,8 @@ import { Message } from '../models/Message.js';
 import { MeetingTimer } from '../models/MeetingTimer.js';
 import { SafeZone } from '../models/SafeZone.js';
 import { Connection } from '../models/Connection.js';
+import { Post } from '../models/Post.js';
+import { PostComment } from '../models/PostComment.js';
 
 const router = Router();
 
@@ -76,6 +79,21 @@ router.post('/reports/:id/resolve', async (req: AuthRequest, res: Response): Pro
         isActive: true,
         expiresAt: new Date(Date.now() + 7 * 86400000), // 7 days
       });
+    }
+
+    // If report targeted a post or comment and was actioned, hide the content
+    if (outcome !== 'false_report' && report.targetId) {
+      if (report.targetType === 'post') {
+        await Post.updateOne(
+          { _id: report.targetId },
+          { moderationStatus: 'hidden', moderationReason: report.reason }
+        );
+      } else if (report.targetType === 'comment') {
+        await PostComment.updateOne(
+          { _id: report.targetId },
+          { moderationStatus: 'hidden' }
+        );
+      }
     }
 
     res.json(report);
@@ -272,6 +290,75 @@ router.post('/timers/check-expired', async (_req: AuthRequest, res: Response): P
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to trigger timer check.' });
+  }
+});
+
+// Admin: Moderate Post
+router.post('/posts/:id/moderate', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: 'Invalid post ID format.' });
+      return;
+    }
+
+    const { action, reason } = req.body; // 'hide' | 'unhide' | 'flag'
+    if (!['hide', 'unhide', 'flag'].includes(action)) {
+      res.status(400).json({ error: 'Invalid moderation action. Must be hide, unhide, or flag.' });
+      return;
+    }
+
+    const moderationStatus = action === 'unhide' ? 'visible' : action === 'hide' ? 'hidden' : 'flagged';
+    const post = await Post.findByIdAndUpdate(
+      id,
+      {
+        moderationStatus,
+        moderationReason: reason || undefined,
+      },
+      { new: true }
+    );
+
+    if (!post) {
+      res.status(404).json({ error: 'Post not found.' });
+      return;
+    }
+
+    res.json({ success: true, post });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to moderate post.' });
+  }
+});
+
+// Admin: Moderate Comment
+router.post('/comments/:id/moderate', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: 'Invalid comment ID format.' });
+      return;
+    }
+
+    const { action } = req.body; // 'hide' | 'unhide' | 'flag'
+    if (!['hide', 'unhide', 'flag'].includes(action)) {
+      res.status(400).json({ error: 'Invalid moderation action. Must be hide, unhide, or flag.' });
+      return;
+    }
+
+    const moderationStatus = action === 'unhide' ? 'visible' : action === 'hide' ? 'hidden' : 'flagged';
+    const comment = await PostComment.findByIdAndUpdate(
+      id,
+      { moderationStatus },
+      { new: true }
+    );
+
+    if (!comment) {
+      res.status(404).json({ error: 'Comment not found.' });
+      return;
+    }
+
+    res.json({ success: true, comment });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to moderate comment.' });
   }
 });
 

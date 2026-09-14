@@ -5,6 +5,7 @@ import { SosEvent } from '../models/SosEvent.js';
 import { Location } from '../models/Location.js';
 import { dispatchEmergencyAlerts } from '../services/dispatchService.js';
 import { emitToAdmins, emitToUser } from '../socket.js';
+import { sendNotification } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -72,6 +73,17 @@ router.post('/trigger', authenticate, async (req: AuthRequest, res: Response): P
       },
     });
     emitToUser(user._id.toString(), 'sos_updated', { sos });
+
+    // Persist unified emergency notification
+    await sendNotification({
+      recipientId: user._id,
+      actor: { _id: user._id, name: 'CasualMeet Emergency System', username: 'emergency' },
+      type: 'sos_alert',
+      title: 'Emergency SOS Active',
+      message: `Emergency SOS triggered at ${sos.locationName}. Trusted contacts and safety teams alerted.`,
+      targetType: 'user',
+      targetId: user._id,
+    });
 
     res.status(201).json({
       sos,

@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import WebSidebar from './components/WebSidebar';
 import WebTopBar from './components/WebTopBar';
 import WebRightSidebar from './components/WebRightSidebar';
@@ -12,15 +12,17 @@ export default function WebLayout({
   children,
   showRightSidebar = true,
 }: WebLayoutProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <div className="scene-bg scene-grid min-h-screen text-ink flex">
-      {/* Left Desktop Sidebar Navigation */}
-      <WebSidebar />
+      {/* Left Desktop & Mobile Sidebar Navigation */}
+      <WebSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Desktop Top Bar */}
-        <WebTopBar />
+        <WebTopBar onMenuToggle={() => setMobileOpen((prev) => !prev)} />
 
         {/* Dynamic Workspace */}
         <div className="flex-1 flex overflow-hidden">

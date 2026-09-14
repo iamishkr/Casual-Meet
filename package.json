@@ -3,13 +3,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k -n \"frontend,backend\" -c \"cyan,magenta\" \"vite\" \"npm run server\"",
+    "dev:frontend": "vite",
+    "dev:all": "concurrently -k -n \"frontend,backend\" -c \"cyan,magenta\" \"vite\" \"npm run server\"",
     "server": "npm run dev --prefix server",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test:api": "node server/test-api.js",
-    "test:security": "node server/test-security.js"
+    "test:security": "node server/test-security.js",
+    "test:phase3b": "npm run test:phase3b --prefix server",
+    "test:phase3c3": "npm run test:phase3c3 --prefix server",
+    "test:phase3c4": "npm run test:phase3c4 --prefix server",
+    "test:phase3c5": "npm run test:phase3c5 --prefix server",
+    "test:phase3c6": "npm run test:phase3c6 --prefix server"
   },
+
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/cli": "^8.5.1",
@@ -36,6 +44,7 @@
     "@types/react-dom": "^18.2.0",
     "@types/uuid": "^9.0.7",
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^10.0.5",
     "tailwindcss": "^4.1.7",
     "typescript": "^5.7.0",
     "vite": "^6.3.5"
