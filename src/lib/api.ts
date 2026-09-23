@@ -45,7 +45,7 @@ export function getApiBase(): string {
   }
   const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
   if (envBase) return envBase;
-  return isCapacitor ? 'http://10.151.192.137:5000/api' : '/api';
+  return isCapacitor ? 'https://casualmeet-backend-vudu.onrender.com/api' : '/api';
 }
 
 export function getAuthToken(): string | null {

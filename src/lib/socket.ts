@@ -10,7 +10,7 @@ export function getSocketUrl(): string {
   if (envSocket) return envSocket;
   const envApi = (import.meta as any).env?.VITE_API_BASE_URL;
   if (envApi) return envApi.replace(/\/api\/?$/, '');
-  return isCapacitor ? 'http://10.151.192.137:5000' : 'http://localhost:5000';
+  return isCapacitor ? 'https://casualmeet-backend-vudu.onrender.com' : 'http://localhost:5000';
 }
 
 let socket: Socket | null = null;
