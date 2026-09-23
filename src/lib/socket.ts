@@ -1,16 +1,23 @@
 import { io, Socket } from 'socket.io-client';
-import { getAuthToken, isCapacitor } from './api';
+import { getAuthToken, getServerUrl, DEFAULT_SERVER_URL, isCapacitor } from './api';
 
 export function getSocketUrl(): string {
-  if (typeof window !== 'undefined') {
-    const custom = localStorage.getItem('casualmeet_server_url');
-    if (custom) return custom.replace(/\/api\/?$/, '');
-  }
   const envSocket = (import.meta as any).env?.VITE_SOCKET_URL;
   if (envSocket) return envSocket;
-  const envApi = (import.meta as any).env?.VITE_API_BASE_URL;
-  if (envApi) return envApi.replace(/\/api\/?$/, '');
-  return isCapacitor ? 'https://casualmeet-backend-vudu.onrender.com' : 'http://localhost:5000';
+
+  const serverUrl = getServerUrl();
+  if (serverUrl) return serverUrl;
+
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname === 'localhost' &&
+    window.location.port === '3000' &&
+    !isCapacitor
+  ) {
+    return 'http://localhost:5000';
+  }
+
+  return DEFAULT_SERVER_URL;
 }
 
 let socket: Socket | null = null;

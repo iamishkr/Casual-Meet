@@ -38,14 +38,46 @@ export const isCapacitor =
    window.location.protocol === 'capacitor:' ||
    (window.location.hostname === 'localhost' && window.location.port === ''));
 
-export function getApiBase(): string {
+export const DEFAULT_SERVER_URL = 'https://casualmeet-backend-vudu.onrender.com';
+
+export function getServerUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('casualmeet_server_url');
-    if (custom) return custom.replace(/\/api\/?$/, '') + '/api';
+    if (custom && custom.trim()) {
+      const cleanCustom = custom.trim().replace(/\/api\/?$/, '');
+      // If the saved custom URL is a private local IP (e.g. 10.x.x.x, 192.168.x.x, localhost)
+      // but the current app is running on a public cloud domain (like *.vercel.app),
+      // stale local IPs won't work — automatically discard and fall back to official cloud backend.
+      const isLocalhostOrLan = /^(https?:\/\/)?(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)(:\d+)?$/i.test(cleanCustom);
+      const isRunningOnCloud = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+      if (isLocalhostOrLan && isRunningOnCloud) {
+        localStorage.removeItem('casualmeet_server_url');
+      } else {
+        return cleanCustom;
+      }
+    }
   }
+
   const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
-  if (envBase) return envBase;
-  return isCapacitor ? 'https://casualmeet-backend-vudu.onrender.com/api' : '/api';
+  if (envBase) return envBase.replace(/\/api\/?$/, '');
+
+  // Local development on web browser at localhost:3000: use relative proxy
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname === 'localhost' &&
+    window.location.port === '3000' &&
+    !isCapacitor
+  ) {
+    return '';
+  }
+
+  return DEFAULT_SERVER_URL;
+}
+
+export function getApiBase(): string {
+  const base = getServerUrl();
+  return base ? `${base}/api` : '/api';
 }
 
 export function getAuthToken(): string | null {

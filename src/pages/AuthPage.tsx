@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { I, Field, inputCls } from '../components/ui';
-import { getApiBase } from '../lib/api';
+import { getApiBase, getServerUrl, DEFAULT_SERVER_URL } from '../lib/api';
 import {
   Eye,
   EyeOff,
@@ -48,7 +48,7 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
 
   // Server Connection Configuration State
   const [serverUrlInput, setServerUrlInput] = useState(() => {
-    return localStorage.getItem('casualmeet_server_url') || getApiBase().replace(/\/api\/?$/, '');
+    return getServerUrl();
   });
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [testResult, setTestResult] = useState<{ status: 'idle' | 'testing' | 'success' | 'failed'; msg?: string }>({ status: 'idle' });
@@ -82,7 +82,7 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
     } catch (err: any) {
       setTestResult({
         status: 'failed',
-        msg: err.name === 'AbortError' ? 'Timed out (Firewall blocking port 5000 or wrong IP)' : (err.message || 'Cannot reach server'),
+        msg: err.name === 'AbortError' ? 'Timed out (Firewall blocking or invalid URL)' : (err.message || 'Cannot reach server'),
       });
     }
   };
@@ -92,6 +92,16 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
     localStorage.setItem('casualmeet_server_url', cleanUrl);
     setServerUrlInput(cleanUrl);
     setSuccessNotice(`Server URL saved: ${cleanUrl}`);
+    setShowServerConfig(false);
+    setTimeout(() => {
+      window.location.reload();
+    }, 400);
+  };
+
+  const handleResetServer = () => {
+    localStorage.removeItem('casualmeet_server_url');
+    setServerUrlInput(DEFAULT_SERVER_URL);
+    setSuccessNotice(`Reset to official cloud backend: ${DEFAULT_SERVER_URL}`);
     setShowServerConfig(false);
     setTimeout(() => {
       window.location.reload();
@@ -413,8 +423,13 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
           <div className="mb-5 rounded-xl border border-line-soft bg-night-900/60 p-2.5 text-xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-dim font-mono text-[11px] truncate">
-                <Wifi size={13} className="text-amber shrink-0" />
-                <span className="truncate">Server: <strong className="text-ink">{serverUrlInput}</strong></span>
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="truncate">
+                  Server: <strong className="text-ink">{serverUrlInput.replace(/^https?:\/\//, '') || 'casualmeet-backend-vudu.onrender.com'}</strong>
+                </span>
               </div>
               <button
                 type="button"
@@ -425,21 +440,30 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
                 }}
                 className="ml-2 shrink-0 flex items-center gap-1 text-[11px] font-bold text-amber hover:underline"
               >
-                <Settings size={12} /> {showServerConfig ? 'Close' : 'Change IP'}
+                <Settings size={12} /> {showServerConfig ? 'Close' : 'Server Settings'}
               </button>
             </div>
 
             {showServerConfig && (
               <div className="mt-3 border-t border-line-soft pt-3 space-y-2.5">
-                <p className="text-[11px] text-mute">
-                  If running on a mobile phone, verify or update your computer's Wi-Fi IP address:
-                </p>
+                <div className="flex items-center justify-between text-[11px]">
+                  <p className="text-mute">
+                    Active backend server endpoint:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResetServer}
+                    className="text-amber underline text-[10px] font-semibold hover:text-[#ffc14d]"
+                  >
+                    Reset to Cloud Default
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={serverUrlInput}
                     onChange={(e) => setServerUrlInput(e.target.value)}
-                    placeholder="e.g. http://10.151.192.137:5000"
+                    placeholder="https://casualmeet-backend-vudu.onrender.com"
                     className="flex-1 rounded-lg border border-line bg-night-950 px-2.5 py-1.5 font-mono text-xs text-ink focus:border-amber focus:outline-none"
                   />
                   <button
