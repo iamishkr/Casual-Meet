@@ -6,6 +6,8 @@ import { DataProvider } from './context/DataContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import WebApp from './apps/web/WebApp';
 import MobileApp from './apps/mobile/MobileApp';
 import AdminApp from './apps/admin/AdminApp';
@@ -29,6 +31,8 @@ function PlatformRouter() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/register" element={<AuthPage mode="register" />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* 1. CASUALMEET CONSUMER WEB (Desktop / Laptop / Tablet) */}
       <Route

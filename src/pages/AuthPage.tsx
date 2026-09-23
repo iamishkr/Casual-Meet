@@ -62,7 +62,20 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
       const res = await fetch(`${cleanUrl}/api/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
-        setTestResult({ status: 'success', msg: 'Connected successfully to backend!' });
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          setTestResult({
+            status: 'failed',
+            msg: 'URL returned HTML instead of API JSON (pointing to a web frontend rather than the backend).',
+          });
+          return;
+        }
+        const data = await res.json().catch(() => null);
+        if (data?.status === 'ok') {
+          setTestResult({ status: 'success', msg: `Connected successfully! (${data.service || 'API Live'})` });
+        } else {
+          setTestResult({ status: 'success', msg: 'Connected successfully to backend!' });
+        }
       } else {
         setTestResult({ status: 'failed', msg: `Server responded with HTTP ${res.status}` });
       }
@@ -871,6 +884,15 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
               </div>
             </div>
           )}
+        </div>
+
+        {/* Legal & Compliance Footer */}
+        <div className="mt-6 text-center text-xs text-mute flex items-center justify-center gap-3">
+          <Link to="/privacy" className="hover:text-amber transition-colors">Privacy Policy</Link>
+          <span>·</span>
+          <Link to="/terms" className="hover:text-amber transition-colors">Terms of Service</Link>
+          <span>·</span>
+          <Link to="/" className="hover:text-amber transition-colors">Home</Link>
         </div>
       </div>
 

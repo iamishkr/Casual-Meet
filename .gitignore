@@ -8,3 +8,14 @@ android/.gradle/
 android/app/build/
 android/build/
 *.apk
+
+# Uploaded Media
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Environment secrets and credentials
+.env
+*.env
+server/.env
+*.keystore
+CasualMeet-Release.apk

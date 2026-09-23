@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   Flag,
   KeyRound,
+  Trash2,
   FileCheck,
   Loader2,
   Grid,
@@ -29,7 +30,7 @@ import MeetupModal from '../../../components/social/MeetupModal';
 
 export default function WebProfilePage() {
   const { userId: paramUserId } = useParams<{ userId?: string }>();
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -59,6 +60,30 @@ export default function WebProfilePage() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [submittingPwd, setSubmittingPwd] = useState(false);
+
+  // Delete account state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteConfirmation.trim().toUpperCase() !== 'DELETE') {
+      toast('err', 'Invalid confirmation', 'Please type DELETE in all capitals to confirm.');
+      return;
+    }
+    setDeletingAccount(true);
+    try {
+      await api.auth.deleteAccount(deleteConfirmation);
+      toast('ok', 'Account Deleted', 'Your account and personal data have been permanently removed.');
+      logout();
+      navigate('/');
+    } catch (err: any) {
+      toast('err', 'Deletion Failed', err?.message || 'Could not delete account.');
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
 
   const loadProfileData = useCallback(async () => {
     if (!effectiveUserId) return;
@@ -198,6 +223,18 @@ export default function WebProfilePage() {
                   leftIcon={<KeyRound size={13} />}
                 >
                   Password
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDeleteConfirmation('');
+                    setDeleteModalOpen(true);
+                  }}
+                  className="hover:border-sos/40 hover:text-sos text-mute"
+                  leftIcon={<Trash2 size={13} />}
+                >
+                  Delete
                 </Button>
               </div>
             ) : (
@@ -449,6 +486,49 @@ export default function WebProfilePage() {
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={submittingPwd}>
                 {submittingPwd ? 'Updating...' : 'Save Password'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Delete Account Modal */}
+      {deleteModalOpen && (
+        <Modal
+          open={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          title="Delete Account"
+          description="Permanently delete your profile, emergency contacts, and active safety timers."
+        >
+          <form onSubmit={handleDeleteAccount} className="space-y-4 pt-1">
+            <div className="rounded-xl border border-sos/30 bg-sos/10 p-3 text-xs text-sos leading-relaxed">
+              <strong>Warning:</strong> This action is permanent and irreversible. Your profile, messages, active meeting timers, emergency contacts, and history will be completely removed.
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-dim mb-1">
+                Type <span className="font-bold text-ink">DELETE</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="DELETE"
+                required
+                className="w-full rounded-xl border border-line bg-night-900 p-2.5 text-xs text-ink outline-none focus:border-sos"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line-soft">
+              <Button variant="ghost" size="sm" onClick={() => setDeleteModalOpen(false)} type="button">
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                type="submit"
+                disabled={deletingAccount || deleteConfirmation.trim().toUpperCase() !== 'DELETE'}
+                className="!bg-sos !text-white hover:!bg-sos/80"
+              >
+                {deletingAccount ? 'Deleting...' : 'Permanently Delete'}
               </Button>
             </div>
           </form>

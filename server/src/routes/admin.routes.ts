@@ -14,6 +14,7 @@ import { SafeZone } from '../models/SafeZone.js';
 import { Connection } from '../models/Connection.js';
 import { Post } from '../models/Post.js';
 import { PostComment } from '../models/PostComment.js';
+import { getSmsGatewayStatus, sendTestSms } from '../services/dispatchService.js';
 
 const router = Router();
 
@@ -359,6 +360,41 @@ router.post('/comments/:id/moderate', async (req: AuthRequest, res: Response): P
     res.json({ success: true, comment });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to moderate comment.' });
+  }
+});
+
+/**
+ * GET /api/admin/sms/status
+ * Returns current configuration and operational status of Fast2SMS & Twilio.
+ */
+router.get('/sms/status', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const status = getSmsGatewayStatus();
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to check SMS gateway status.' });
+  }
+});
+
+/**
+ * POST /api/admin/sms/test
+ * Sends a standalone diagnostic SMS to test carrier routing.
+ */
+router.post('/sms/test', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { phone, message } = req.body;
+    if (!phone || typeof phone !== 'string') {
+      res.status(400).json({ error: 'Target phone number is required.' });
+      return;
+    }
+
+    const result = await sendTestSms(phone, message);
+    res.json({
+      success: result.status === 'sent' || result.status === 'simulated',
+      result,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to execute test SMS.' });
   }
 });
 

@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import mongoose from 'mongoose';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { Notification } from '../models/Notification.js';
+import { DeviceToken } from '../models/DeviceToken.js';
 import { SAFE_USER_FIELDS } from '../utils/socialAuth.js';
 
 const router = Router();
@@ -94,6 +95,80 @@ router.put('/read-all', async (req: AuthRequest, res: Response): Promise<void> =
     res.json({ success: true, updatedCount: result.modifiedCount });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to mark all as read.' });
+  }
+});
+
+/**
+ * POST /api/notifications/register-device
+ * Registers or updates a device token (FCM / APNS / Web Push) for background push notifications.
+ */
+router.post('/register-device', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { token, platform, deviceInfo } = req.body;
+
+    if (!token || typeof token !== 'string' || token.trim().length < 5) {
+      res.status(400).json({ error: 'A valid device token string is required.' });
+      return;
+    }
+
+    const cleanToken = token.trim();
+    const validPlatforms = ['android', 'ios', 'web'] as const;
+    const selectedPlatform = validPlatforms.includes(platform) ? platform : 'android';
+
+    // Upsert token: if this device token was previously registered to another user or session, update ownership
+    const deviceRecord = await DeviceToken.findOneAndUpdate(
+      { token: cleanToken },
+      {
+        userId: user._id,
+        platform: selectedPlatform,
+        deviceInfo: typeof deviceInfo === 'string' ? deviceInfo.trim().slice(0, 200) : undefined,
+        lastActiveAt: new Date(),
+      },
+      { upsert: true, new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Device token registered successfully.',
+      device: {
+        id: deviceRecord._id,
+        platform: deviceRecord.platform,
+        lastActiveAt: deviceRecord.lastActiveAt,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to register device token.' });
+  }
+});
+
+/**
+ * DELETE /api/notifications/unregister-device
+ * Unregisters a device token (e.g. on logout or app uninstall).
+ */
+router.delete('/unregister-device', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { token } = req.body;
+
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({ error: 'Device token string is required.' });
+      return;
+    }
+
+    const cleanToken = token.trim();
+    const result = await DeviceToken.deleteOne({
+      token: cleanToken,
+      userId: user._id,
+    });
+
+    res.json({
+      success: true,
+      message: 'Device token unregistered successfully.',
+      deleted: result.deletedCount > 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to unregister device token.' });
   }
 });
 

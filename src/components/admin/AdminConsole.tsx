@@ -460,21 +460,69 @@ function Overview() {
 /* ================= SOS BOARD ================= */
 
 function SosBoard() {
+  const { toast } = useToast();
   const [events, setEvents] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [gatewayStatus, setGatewayStatus] = useState<any>(null);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testMessage, setTestMessage] = useState('');
+  const [testingSms, setTestingSms] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const fetchSos = useCallback(async () => {
     try {
-      const res = await api.admin.getSos();
-      if (res?.events) setEvents(res.events);
-      if (res?.logs) setLogs(res.logs);
+      const [sosRes, statusRes] = await Promise.allSettled([
+        api.admin.getSos(),
+        api.admin.getSmsStatus(),
+      ]);
+      if (sosRes.status === 'fulfilled' && sosRes.value?.events) setEvents(sosRes.value.events);
+      if (sosRes.status === 'fulfilled' && sosRes.value?.logs) setLogs(sosRes.value.logs);
+      if (statusRes.status === 'fulfilled') setGatewayStatus(statusRes.value);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleRetrySms = async (sosId: string) => {
+    try {
+      setRetryingId(sosId);
+      const res = await api.sos.retrySms(sosId);
+      toast('ok', 'Alerts Retried', `Retried ${res.retriedCount} emergency alert(s).`);
+      fetchSos();
+    } catch (err: any) {
+      toast('err', 'Retry Failed', err.message);
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const handleTestSms = async () => {
+    if (!testPhone.trim()) {
+      toast('err', 'Target phone required', 'Please provide a valid mobile number with country code.');
+      return;
+    }
+    try {
+      setTestingSms(true);
+      const res = await api.admin.testSms(testPhone.trim(), testMessage.trim() || undefined);
+      if (res?.success) {
+        toast('ok', 'Test SMS Dispatched', `Status: ${res.result?.status} via ${res.result?.gateway} (${res.result?.sid})`);
+        setShowTestModal(false);
+        setTestPhone('');
+        setTestMessage('');
+        fetchSos();
+      } else {
+        toast('err', 'Test SMS Failed', res?.result?.error || 'Unknown carrier error');
+      }
+    } catch (err: any) {
+      toast('err', 'Test SMS Error', err.message);
+    } finally {
+      setTestingSms(false);
+    }
+  };
 
   useEffect(() => {
     fetchSos();
@@ -502,6 +550,33 @@ function SosBoard() {
           title="Live SOS Incident Board"
           sub="Realtime alerts with per-contact SMS delivery state directly from MongoDB"
         />
+
+        {/* Live SMS Carrier Gateways Status Bar */}
+        <div className="mb-4 rounded-xl border border-line-soft bg-night-900/80 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-mute">
+                SMS Gateways:
+              </span>
+              <Badge tone={gatewayStatus?.mode === 'live' ? 'ok' : 'dim'}>
+                {gatewayStatus?.mode === 'live' ? '● LIVE MODE' : '○ SIMULATION MODE'}
+              </Badge>
+              <Badge tone={gatewayStatus?.fast2sms?.configured ? 'ok' : 'dim'}>
+                Fast2SMS: {gatewayStatus?.fast2sms?.configured ? 'Active (Quick Route)' : 'Unset'}
+              </Badge>
+              <Badge tone={gatewayStatus?.twilio?.configured ? 'ok' : 'dim'}>
+                Twilio: {gatewayStatus?.twilio?.configured ? `Active (${gatewayStatus.twilio.senderNumber})` : 'Unset'}
+              </Badge>
+            </div>
+            <button
+              onClick={() => setShowTestModal(true)}
+              className="rounded-lg border border-line-soft bg-night-800 px-2.5 py-1 text-xs font-semibold text-fg hover:bg-night-700 transition"
+            >
+              Test SMS Gateway
+            </button>
+          </div>
+        </div>
+
         {loading ? (
           <div className="shimmer h-32 rounded-xl" />
         ) : active.length === 0 ? (
@@ -558,6 +633,13 @@ function SosBoard() {
                         )}
                       </Badge>
                       <Badge tone="warn">{s.contactsNotified} SMS Dispatched</Badge>
+                      <button
+                        onClick={() => handleRetrySms(s._id)}
+                        disabled={retryingId === s._id}
+                        className="rounded-lg border border-sos/40 bg-sos/15 px-2.5 py-1 text-xs font-semibold text-sos hover:bg-sos/25 transition disabled:opacity-50"
+                      >
+                        {retryingId === s._id ? 'Retrying...' : 'Retry SMS'}
+                      </button>
                     </div>
                   </div>
                   {s.locationName && (
@@ -578,15 +660,32 @@ function SosBoard() {
                       </p>
                     ) : (
                       <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-line-soft/40 text-[10px] uppercase text-dim">
+                            <th className="py-1.5 pl-3">Contact</th>
+                            <th className="py-1.5">Phone</th>
+                            <th className="py-1.5">Gateway</th>
+                            <th className="py-1.5">Status</th>
+                            <th className="py-1.5 pr-3 text-right">Details</th>
+                          </tr>
+                        </thead>
                         <tbody>
                           {incidentLogs.map((l) => (
                             <tr key={l._id} className="border-b border-line-soft/50 last:border-0">
                               <td className="py-2 pl-3 font-semibold">{l.contactName}</td>
                               <td className="py-2 text-mute">{l.contactPhone}</td>
                               <td className="py-2">
-                                <Badge tone={l.status === 'sent' ? 'ok' : 'warn'}>
+                                <span className="font-mono text-[10px] uppercase text-dim">
+                                  {l.gateway}
+                                </span>
+                              </td>
+                              <td className="py-2">
+                                <Badge tone={l.status === 'sent' ? 'ok' : l.status === 'failed' ? 'err' : 'warn'}>
                                   {l.status}
                                 </Badge>
+                              </td>
+                              <td className="py-2 pr-3 text-right font-mono text-[10px] text-mute">
+                                {l.gatewayResponse?.sid || l.lastError || '-'}
                               </td>
                             </tr>
                           ))}
@@ -600,6 +699,42 @@ function SosBoard() {
           </div>
         )}
       </Reveal>
+
+      {showTestModal && (
+        <Modal open={showTestModal} onClose={() => setShowTestModal(false)} title="Test SMS Carrier Gateway">
+          <div className="space-y-4">
+            <p className="text-xs text-mute">
+              Send an instant diagnostic test alert through the active SMS provider pipeline (Fast2SMS for India numbers, Twilio for International).
+            </p>
+            <Field label="Recipient Phone Number (e.g. +919876543210)">
+              <input
+                type="tel"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="+919876543210"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Custom Test Message (Optional)">
+              <input
+                type="text"
+                value={testMessage}
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="Test SMS from CasualMeet Admin Console"
+                className={inputCls}
+              />
+            </Field>
+            <div className="flex justify-end gap-2 pt-2">
+              <Btn tone="outline" size="sm" onClick={() => setShowTestModal(false)}>
+                Cancel
+              </Btn>
+              <Btn tone="safe" size="sm" onClick={handleTestSms} disabled={testingSms}>
+                {testingSms ? 'Transmitting...' : 'Send Test SMS'}
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {history.length > 0 && (
         <Reveal delay={80}>

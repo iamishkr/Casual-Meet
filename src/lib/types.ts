@@ -519,11 +519,11 @@ export interface FeedResponseDTO {
 export interface SocialNotificationDTO {
   id: string;
   type: string;
-  actor: {
+  actor?: {
     id: string;
     name: string;
     username: string;
-  };
+  } | null;
   targetType?: string;
   targetId?: string;
   title: string;

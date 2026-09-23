@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { SosEvent } from '../models/SosEvent.js';
 import { Location } from '../models/Location.js';
-import { dispatchEmergencyAlerts } from '../services/dispatchService.js';
+import { dispatchEmergencyAlerts, retryFailedAlerts } from '../services/dispatchService.js';
 import { emitToAdmins, emitToUser } from '../socket.js';
 import { sendNotification } from '../services/notificationService.js';
 
@@ -142,5 +142,44 @@ const resolveSosHandler = async (req: AuthRequest, res: Response): Promise<void>
 
 router.post('/:id/resolve', authenticate, resolveSosHandler);
 router.put('/:id/resolve', authenticate, resolveSosHandler);
+
+/**
+ * POST /api/sos/:id/retry-sms
+ * Retries delivery for any failed emergency contact alerts for an SOS incident.
+ */
+router.post('/:id/retry-sms', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404).json({ error: 'SOS incident not found.' });
+      return;
+    }
+
+    const sos = await SosEvent.findById(id);
+    if (!sos) {
+      res.status(404).json({ error: 'SOS incident not found.' });
+      return;
+    }
+
+    const isOwner = sos.userId.toString() === user._id.toString();
+    const isAdminOrMod = user.role === 'super_admin' || user.role === 'moderator';
+
+    if (!isOwner && !isAdminOrMod) {
+      res.status(403).json({ error: 'Access denied. You do not have permission to retry alerts for this SOS.' });
+      return;
+    }
+
+    const results = await retryFailedAlerts(sos._id);
+    res.json({
+      success: true,
+      retriedCount: results.length,
+      details: results,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to retry emergency alerts.' });
+  }
+});
 
 export default router;

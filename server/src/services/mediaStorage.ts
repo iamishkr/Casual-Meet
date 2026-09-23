@@ -168,12 +168,17 @@ export function isSafeStorageKey(key: string): boolean {
 }
 
 export interface IMediaStorageProvider {
+  readonly name: string;
   save(buffer: Buffer, originalFilename: string): Promise<SavedMediaInfo>;
   delete(storageKey: string): Promise<boolean>;
   getFilePath(storageKey: string): string | null;
+  getBuffer(storageKey: string): Promise<Buffer | null>;
+  getPublicUrl?(storageKey: string): string | null;
 }
 
 export class LocalStorageProvider implements IMediaStorageProvider {
+  readonly name = 'local';
+
   async save(buffer: Buffer, originalFilename: string): Promise<SavedMediaInfo> {
     const validation = validateMediaBuffer(buffer);
     if (!validation.valid || !validation.detectedMime || !validation.extension || !validation.mediaType) {
@@ -216,10 +221,143 @@ export class LocalStorageProvider implements IMediaStorageProvider {
     }
     return null;
   }
+
+  async getBuffer(storageKey: string): Promise<Buffer | null> {
+    const filePath = this.getFilePath(storageKey);
+    if (!filePath) return null;
+    try {
+      return await fs.promises.readFile(filePath);
+    } catch {
+      return null;
+    }
+  }
 }
 
-// Authoritative storage instance (defaults to local storage in development)
-export const mediaStorage = new LocalStorageProvider();
+/**
+ * Cloud Storage Provider for Supabase Storage (S3-compatible REST API).
+ * Used in production cloud deployments to ensure uploaded media persists permanently.
+ */
+export class SupabaseStorageProvider implements IMediaStorageProvider {
+  readonly name = 'supabase';
+  private supabaseUrl: string;
+  private serviceKey: string;
+  private bucket: string;
+
+  constructor(supabaseUrl: string, serviceKey: string, bucket: string = 'casualmeet-media') {
+    this.supabaseUrl = supabaseUrl.replace(/\/+$/, '');
+    this.serviceKey = serviceKey;
+    this.bucket = bucket;
+  }
+
+  async save(buffer: Buffer, originalFilename: string): Promise<SavedMediaInfo> {
+    const validation = validateMediaBuffer(buffer);
+    if (!validation.valid || !validation.detectedMime || !validation.extension || !validation.mediaType) {
+      throw new Error(validation.error || 'Invalid media format.');
+    }
+
+    const randomId = crypto.randomUUID();
+    const storageKey = `${randomId}.${validation.extension}`;
+
+    const uploadUrl = `${this.supabaseUrl}/storage/v1/object/${this.bucket}/${storageKey}`;
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.serviceKey}`,
+        apikey: this.serviceKey,
+        'Content-Type': validation.detectedMime,
+        'x-upsert': 'true',
+      },
+      body: buffer,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Cloud storage upload failed (${res.status}): ${errText || res.statusText}`);
+    }
+
+    return {
+      storageKey,
+      mediaType: validation.mediaType,
+      mimeType: validation.detectedMime,
+      sizeBytes: buffer.length,
+    };
+  }
+
+  async delete(storageKey: string): Promise<boolean> {
+    if (!isSafeStorageKey(storageKey)) return false;
+    try {
+      const deleteUrl = `${this.supabaseUrl}/storage/v1/object/${this.bucket}/${storageKey}`;
+      const res = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${this.serviceKey}`,
+          apikey: this.serviceKey,
+        },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  getFilePath(_storageKey: string): string | null {
+    // Cloud storage assets are not stored on local disk
+    return null;
+  }
+
+  async getBuffer(storageKey: string): Promise<Buffer | null> {
+    if (!isSafeStorageKey(storageKey)) return null;
+    try {
+      const downloadUrl = `${this.supabaseUrl}/storage/v1/object/authenticated/${this.bucket}/${storageKey}`;
+      const res = await fetch(downloadUrl, {
+        headers: {
+          Authorization: `Bearer ${this.serviceKey}`,
+          apikey: this.serviceKey,
+        },
+      });
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        return Buffer.from(ab);
+      }
+      // Fallback: public endpoint
+      const pubUrl = `${this.supabaseUrl}/storage/v1/object/public/${this.bucket}/${storageKey}`;
+      const pubRes = await fetch(pubUrl);
+      if (pubRes.ok) {
+        const ab = await pubRes.arrayBuffer();
+        return Buffer.from(ab);
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  getPublicUrl(storageKey: string): string | null {
+    if (!isSafeStorageKey(storageKey)) return null;
+    return `${this.supabaseUrl}/storage/v1/object/public/${this.bucket}/${storageKey}`;
+  }
+}
+
+/**
+ * Initializes the storage provider based on environment variables.
+ * Falls back to LocalStorageProvider for zero-config local development.
+ */
+export function createMediaStorageProvider(): IMediaStorageProvider {
+  const provider = (process.env.STORAGE_PROVIDER || '').toLowerCase();
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+  if ((provider === 'supabase' || (!provider && supabaseUrl && supabaseKey)) && supabaseUrl && supabaseKey) {
+    const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'casualmeet-media';
+    console.log(`[MediaStorage] Active Provider: Supabase Cloud Storage (bucket: ${bucket})`);
+    return new SupabaseStorageProvider(supabaseUrl, supabaseKey, bucket);
+  }
+
+  return new LocalStorageProvider();
+}
+
+// Authoritative storage instance
+export const mediaStorage: IMediaStorageProvider = createMediaStorageProvider();
 
 /**
  * Orphan Media Cleanup Strategy:

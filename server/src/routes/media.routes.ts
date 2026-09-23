@@ -109,12 +109,6 @@ router.get('/file/:storageKey', async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const filePath = mediaStorage.getFilePath(storageKey);
-    if (!filePath) {
-      res.status(404).json({ error: 'Media file does not exist on disk.' });
-      return;
-    }
-
     // Resolve caller identity (header or token param)
     const viewer = await resolveViewer(req);
 
@@ -196,7 +190,25 @@ router.get('/file/:storageKey', async (req: Request, res: Response): Promise<voi
     // Authorized: stream file with security headers
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Type', asset.mimeType);
-    res.sendFile(filePath);
+
+    // 1. Fast path: local disk file
+    const filePath = mediaStorage.getFilePath(storageKey);
+    if (filePath) {
+      res.sendFile(filePath);
+      return;
+    }
+
+    // 2. Cloud storage buffer path
+    if (typeof mediaStorage.getBuffer === 'function') {
+      const buffer = await mediaStorage.getBuffer(storageKey);
+      if (buffer) {
+        res.setHeader('Content-Length', buffer.length);
+        res.end(buffer);
+        return;
+      }
+    }
+
+    res.status(404).json({ error: 'Media file could not be located in storage.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to serve media.' });
   }

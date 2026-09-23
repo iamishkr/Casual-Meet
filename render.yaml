@@ -14,3 +14,14 @@ services:
         generateValue: true
       - key: MONGODB_URI
         sync: false
+      - key: STORAGE_PROVIDER
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: casualmeet-media
+      - key: FCM_SERVER_KEY
+        sync: false
+

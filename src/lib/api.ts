@@ -75,16 +75,31 @@ function getAuthHeaders(): HeadersInit {
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = { ...getAuthHeaders(), ...(options.headers || {}) };
   const res = await fetch(`${getApiBase()}${endpoint}`, { ...options, headers });
+  const contentType = res.headers.get('content-type') || '';
 
   if (!res.ok) {
     let errorMsg = `Request failed (${res.status})`;
     try {
-      const data = await res.json();
-      if (data?.error) errorMsg = data.error;
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data?.error) errorMsg = data.error;
+      } else {
+        const text = await res.text();
+        if (text && !text.includes('<!DOCTYPE') && !text.includes('<html')) {
+          errorMsg = text.slice(0, 150);
+        }
+      }
     } catch {
       // ignore
     }
     throw new Error(errorMsg);
+  }
+
+  // Guard against SPA fallback (e.g. Vercel/Netlify returning index.html for /api routes)
+  if (contentType.includes('text/html')) {
+    throw new Error(
+      'Server returned HTML instead of JSON. Ensure your VITE_API_BASE_URL is configured or use the Server Settings gear on the login page.'
+    );
   }
 
   return res.json();
@@ -123,6 +138,11 @@ export const api = {
     logout: () =>
       request<{ message: string }>('/auth/logout', {
         method: 'POST',
+      }),
+    deleteAccount: (confirmation?: string) =>
+      request<{ success: boolean; message: string }>('/auth/delete-account', {
+        method: 'DELETE',
+        body: JSON.stringify({ confirmation }),
       }),
   },
 
@@ -290,6 +310,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ status }),
       }),
+    retrySms: (id: string) =>
+      request<{ success: boolean; retriedCount: number; details: any[] }>(`/sos/${id}/retry-sms`, {
+        method: 'POST',
+      }),
   },
 
   admin: {
@@ -330,6 +354,17 @@ export const api = {
       request<any>('/admin/safe-zones', {
         method: 'POST',
         body: JSON.stringify(zone),
+      }),
+    getSmsStatus: () =>
+      request<{
+        mode: 'live' | 'simulated';
+        fast2sms: { configured: boolean; route: string };
+        twilio: { configured: boolean; senderNumber: string | null };
+      }>('/admin/sms/status'),
+    testSms: (phone: string, message?: string) =>
+      request<{ success: boolean; result: any }>('/admin/sms/test', {
+        method: 'POST',
+        body: JSON.stringify({ phone, message }),
       }),
   },
 
@@ -455,6 +490,20 @@ export const api = {
       request<{ success: boolean; updatedCount: number }>('/notifications/read-all', {
         method: 'PUT',
       }),
+    registerDevice: (data: { token: string; platform?: 'android' | 'ios' | 'web'; deviceInfo?: string }) =>
+      request<{
+        success: boolean;
+        message: string;
+        device: { id: string; platform: string; lastActiveAt: string };
+      }>('/notifications/register-device', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    unregisterDevice: (token: string) =>
+      request<{ success: boolean; message: string; deleted: boolean }>('/notifications/unregister-device', {
+        method: 'DELETE',
+        body: JSON.stringify({ token }),
+      }),
   },
 
   media: {
@@ -533,4 +582,6 @@ export const api = {
       }),
   },
 };
+
+
 

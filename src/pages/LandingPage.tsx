@@ -209,13 +209,20 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="relative z-10 border-t border-line-soft bg-night-900/90 py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 text-center sm:flex-row sm:text-left">
-          <p className="font-mono text-xs text-dim">
-            CasualMeet · Built with React, TailwindCSS, Vite & MongoDB Domain Models
-          </p>
-          <div className="flex items-center gap-4 text-xs font-semibold text-mute">
-            <Link to="/app" className="hover:text-amber">User Portal</Link>
-            <Link to="/admin" className="hover:text-amber">Creator Admin</Link>
-            <Link to="/login" className="hover:text-amber">Login</Link>
+          <div>
+            <p className="font-mono text-xs text-dim">
+              CasualMeet · Peer-to-Peer Physical Safety & Social Meetup Platform
+            </p>
+            <p className="mt-1 text-[11px] text-mute/80 max-w-xl">
+              Emergency Advisory: CasualMeet is a supplemental peer safety tool and does NOT replace official local police, fire, or ambulance dispatch (911/112/100).
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-mute">
+            <Link to="/privacy" className="hover:text-amber transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-amber transition-colors">Terms of Service</Link>
+            <Link to="/app" className="hover:text-amber transition-colors">User Portal</Link>
+            <Link to="/admin" className="hover:text-amber transition-colors">Creator Admin</Link>
+            <Link to="/login" className="hover:text-amber transition-colors">Login</Link>
           </div>
         </div>
       </footer>

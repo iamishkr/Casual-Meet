@@ -26,6 +26,7 @@ import {
   Sparkles,
   Lock,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 
 export default function MobileProfileView() {
@@ -58,6 +59,30 @@ export default function MobileProfileView() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [submittingPwd, setSubmittingPwd] = useState(false);
+
+  // Delete account state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteConfirmation.trim().toUpperCase() !== 'DELETE') {
+      toast('err', 'Invalid confirmation', 'Please type DELETE in all capitals to confirm.');
+      return;
+    }
+    setDeletingAccount(true);
+    try {
+      await api.auth.deleteAccount(deleteConfirmation);
+      toast('ok', 'Account Deleted', 'Your account and personal data have been removed.');
+      logout();
+      navigate('/');
+    } catch (err: any) {
+      toast('err', 'Deletion Failed', err?.message || 'Could not delete account.');
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
 
   const loadProfileData = useCallback(async () => {
     if (!effectiveUserId) return;
@@ -253,10 +278,23 @@ export default function MobileProfileView() {
                 variant="ghost"
                 size="sm"
                 onClick={logout}
-                className="text-sos hover:bg-sos/15"
+                className="text-mute hover:text-ink hover:bg-night-800"
                 leftIcon={<LogOut size={13} />}
               >
                 Logout
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDeleteConfirmation('');
+                  setDeleteModalOpen(true);
+                }}
+                className="text-dim hover:text-sos hover:bg-sos/15"
+                leftIcon={<Trash2 size={13} />}
+              >
+                Delete Account
               </Button>
             </>
           ) : (
@@ -482,6 +520,54 @@ export default function MobileProfileView() {
                 disabled={submittingPwd || !oldPassword || !newPassword}
               >
                 {submittingPwd ? 'Saving...' : 'Update Password'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Delete Account Modal */}
+      {deleteModalOpen && (
+        <Modal
+          open={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          title="Delete Account"
+          description="Permanently delete your profile and data."
+        >
+          <form onSubmit={handleDeleteAccount} className="space-y-4 pt-1">
+            <div className="rounded-xl border border-sos/30 bg-sos/10 p-3 text-xs text-sos leading-relaxed">
+              <strong>Warning:</strong> This action cannot be undone. All your posts, conversations, active safety timers, and emergency contacts will be permanently purged.
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] uppercase text-dim mb-1">
+                Type <span className="font-bold text-ink">DELETE</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="DELETE"
+                required
+                className="w-full rounded-xl border border-line bg-night-900 p-2.5 text-xs text-ink outline-none focus:border-sos"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-line-soft">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeleteModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={deletingAccount || deleteConfirmation.trim().toUpperCase() !== 'DELETE'}
+                className="!bg-sos !text-white hover:!bg-sos/80"
+              >
+                {deletingAccount ? 'Deleting...' : 'Permanently Delete'}
               </Button>
             </div>
           </form>

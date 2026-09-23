@@ -8,14 +8,20 @@
     "dev:all": "concurrently -k -n \"frontend,backend\" -c \"cyan,magenta\" \"vite\" \"npm run server\"",
     "server": "npm run dev --prefix server",
     "build": "vite build",
+    "build:server": "npm run build --prefix server",
+    "build:all": "npm run build && npm run build:server",
     "typecheck": "tsc --noEmit",
     "test:api": "node server/test-api.js",
     "test:security": "node server/test-security.js",
+    "test:push": "node server/test-push-notifications.js",
+    "test:sms": "node server/test-sms-gateways.js",
     "test:phase3b": "npm run test:phase3b --prefix server",
     "test:phase3c3": "npm run test:phase3c3 --prefix server",
     "test:phase3c4": "npm run test:phase3c4 --prefix server",
     "test:phase3c5": "npm run test:phase3c5 --prefix server",
-    "test:phase3c6": "npm run test:phase3c6 --prefix server"
+    "test:phase3c6": "npm run test:phase3c6 --prefix server",
+    "android:build": "npm run build && npx cap sync android && cd android && gradlew.bat bundleRelease",
+    "android:apk": "npm run build && npx cap sync android && cd android && gradlew.bat assembleRelease"
   },
 
   "dependencies": {

@@ -12,8 +12,11 @@ export interface ISosDeliveryLog extends Document {
   status: DeliveryStatus;
   attempts: number;
   gatewayResponse?: {
-    sid: string;
-    cost: string;
+    sid?: string;
+    status?: string;
+    cost?: string;
+    mode?: string;
+    note?: string;
   };
   lastError?: string;
   createdAt: Date;
@@ -31,7 +34,10 @@ const SosDeliveryLogSchema = new Schema<ISosDeliveryLog>(
     attempts: { type: Number, default: 1 },
     gatewayResponse: {
       sid: String,
+      status: String,
       cost: String,
+      mode: String,
+      note: String,
     },
     lastError: { type: String },
   },

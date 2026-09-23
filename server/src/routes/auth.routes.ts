@@ -6,6 +6,12 @@ import { User } from '../models/User.js';
 import { Location } from '../models/Location.js';
 import { EmergencyContact } from '../models/EmergencyContact.js';
 import { Suspension } from '../models/Suspension.js';
+import { MeetingTimer } from '../models/MeetingTimer.js';
+import { SosEvent } from '../models/SosEvent.js';
+import { Connection } from '../models/Connection.js';
+import { Follow } from '../models/Follow.js';
+import { Notification } from '../models/Notification.js';
+import { DeviceToken } from '../models/DeviceToken.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { getJwtSecret } from '../config/jwt.js';
 
@@ -411,6 +417,57 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise
     bio: user.bio,
     interests: user.interests,
   });
+});
+
+// -------------------------------------------------------------
+// DELETE /api/auth/delete-account - Self-Service Account Deletion (App Store / Play Store Mandate)
+// -------------------------------------------------------------
+router.delete('/delete-account', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const userId = user._id;
+
+    // 1. Cancel active meeting safety timers
+    await MeetingTimer.updateMany(
+      { userId, status: { $in: ['active', 'extended'] } },
+      { $set: { status: 'cancelled' } }
+    );
+
+    // 2. Resolve any active SOS emergencies
+    await SosEvent.updateMany(
+      { userId, status: 'active' },
+      { $set: { status: 'resolved', resolvedAt: new Date() } }
+    );
+
+    // 3. Purge personal location records
+    await Location.deleteMany({ userId });
+
+    // 4. Purge emergency contacts
+    await EmergencyContact.deleteMany({ userId });
+
+    // 5. Clean up social relationships (connections, follows)
+    await Connection.deleteMany({
+      $or: [{ requesterId: userId }, { recipientId: userId }],
+    });
+    await Follow.deleteMany({
+      $or: [{ followerId: userId }, { followingId: userId }],
+    });
+
+    // 6. Purge notifications and registered device tokens
+    await Notification.deleteMany({ recipientId: userId });
+    await DeviceToken.deleteMany({ userId });
+
+    // 7. Delete user account record
+    await User.findByIdAndDelete(userId);
+
+    res.json({
+      success: true,
+      message: 'Your account and all associated personal data have been permanently deleted.',
+    });
+  } catch (err: any) {
+    console.error('Account deletion error:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete account.' });
+  }
 });
 
 export default router;

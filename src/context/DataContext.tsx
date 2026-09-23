@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import { connectSocket, getSocket } from '../lib/socket';
+import { registerDeviceForPush } from '../lib/pushNotifications';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import type { MeetingTimerDTO, SosIncidentDTO } from '../lib/types';
@@ -75,6 +76,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
 
     refreshSafetyState();
+    registerDeviceForPush();
     const socket = connectSocket(token);
 
     const handleSosTriggered = (data: any) => {

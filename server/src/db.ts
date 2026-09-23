@@ -1,3 +1,4 @@
+import dns from 'dns';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
@@ -9,11 +10,19 @@ export async function connectDB(): Promise<string> {
   if (uri && uri.trim()) {
     try {
       console.log(`[MongoDB] Connecting to external MongoDB at ${uri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}...`);
+      if (uri.startsWith('mongodb+srv://')) {
+        try {
+          dns.setServers(['8.8.8.8', '1.1.1.1']);
+        } catch {
+          // ignore if environment restricts custom DNS
+        }
+      }
       await mongoose.connect(uri);
       console.log('[MongoDB] Connected successfully to external MongoDB database.');
       return uri;
-    } catch (err) {
-      console.warn('[MongoDB] Failed to connect to external MongoDB URI. Falling back to embedded in-process database...');
+    } catch (err: any) {
+      console.warn('[MongoDB] Failed to connect to external MongoDB URI:', err?.message || err);
+      console.warn('[MongoDB] Falling back to embedded in-process database...');
     }
   }
 

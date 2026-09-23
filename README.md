@@ -22,11 +22,36 @@ If you prefer running services in separate terminals:
   npm run dev:frontend
   ```
 
-### 3. Run Automated Tests
+### 3. Run Automated Verification Test Suites
 ```bash
-# Run API & Database Integration tests
+# Full Backend API & Database tests
 npm run test:api
 
-# Run Security Hardening test suite
+# Security Hardening & Rate Limiting tests
 npm run test:security
+
+# Background Push Notification & Device Registry tests
+npm run test:push
+
+# Live SMS Gateway & Carrier Routing tests
+npm run test:sms
+
+# Social, Content Moderation & Ephemeral Stories tests
+npm run test:phase3b
 ```
+
+### 4. Build Android Release Artifacts (Google Play Store)
+```bash
+# Build production Android App Bundle (.aab for Google Play Store submission)
+npm run android:build
+
+# Build release APK (.apk for sideloading/direct testing)
+npm run android:apk
+```
+
+### 5. Deployment & Production Guides
+- **Google Play Store & App Store Submission**: [`docs/PLAY_STORE_SUBMISSION.md`](docs/PLAY_STORE_SUBMISSION.md)
+- **API Reference**: [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md)
+- **Render Production Blueprint**: [`render.yaml`](render.yaml)
+- **Production Environment Template**: [`.env.production.example`](.env.production.example)
+
