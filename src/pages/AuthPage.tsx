@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { I, Field, inputCls } from '../components/ui';
 import { getApiBase, getServerUrl, DEFAULT_SERVER_URL } from '../lib/api';
+import { INDIAN_CITIES } from '../lib/indianCities';
 import {
   Eye,
   EyeOff,
@@ -23,6 +24,7 @@ import {
   Settings,
   Wifi,
   RefreshCw,
+  MapPin,
 } from 'lucide-react';
 
 export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'login' | 'register' }) {
@@ -43,7 +45,7 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
     }
   }, [targetRole]);
 
-  const { login, register, forgotPassword, resetPassword, quickLogin } = useAuth();
+  const { login, register, forgotPassword, resetPassword } = useAuth();
   const navigate = useNavigate();
 
   // Server Connection Configuration State
@@ -124,7 +126,7 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
     password: '',
     confirmPassword: '',
     phone: '',
-    city: 'Bengaluru',
+    city: '',
     occupation: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
@@ -267,13 +269,6 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
       }
       setError(err);
     }
-  };
-
-  // 1-Click Quick Demo Login
-  const handleQuick = (userId: string, path: string) => {
-    setError(null);
-    quickLogin(userId);
-    navigate(path);
   };
 
   // Handle Forgot Password Initiation (Step 1)
@@ -632,47 +627,6 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
                   </button>
                 </p>
               </div>
-
-              {/* Quick 1-Click Instant Demo Login */}
-              <div className="mt-6 border-t border-line-soft pt-5">
-                <p className="mb-2.5 text-center font-mono text-[10px] uppercase tracking-widest text-dim">
-                  ⚡ 1-Click Instant Verified Logins
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    id="quick-login-aisha"
-                    onClick={() => handleQuick('u_aisha', '/app')}
-                    className="btn-press flex flex-col items-center gap-1 rounded-xl border border-line-soft bg-night-900/60 p-2.5 text-center hover:border-amber/40 transition-colors"
-                  >
-                    <span className="text-lg">👩</span>
-                    <span className="text-xs font-bold text-ink">Aisha</span>
-                    <span className="font-mono text-[9px] text-dim">user123</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="quick-login-rohan"
-                    onClick={() => handleQuick('u_rohan', '/app')}
-                    className="btn-press flex flex-col items-center gap-1 rounded-xl border border-line-soft bg-night-900/60 p-2.5 text-center hover:border-amber/40 transition-colors"
-                  >
-                    <span className="text-lg">👨</span>
-                    <span className="text-xs font-bold text-ink">Rohan</span>
-                    <span className="font-mono text-[9px] text-dim">user123</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    id="quick-login-kavita"
-                    onClick={() => handleQuick('u_kavita', '/admin')}
-                    className="btn-press flex flex-col items-center gap-1 rounded-xl border border-amber/40 bg-amber/10 p-2.5 text-center hover:bg-amber/20 transition-colors"
-                  >
-                    <span className="text-lg">🛡️</span>
-                    <span className="text-xs font-bold text-amber">Kavita</span>
-                    <span className="font-mono text-[9px] text-amber/80">admin123</span>
-                  </button>
-                </div>
-              </div>
             </div>
           ) : (
             /* ========================================================================= */
@@ -830,20 +784,28 @@ export default function AuthPage({ mode: initialMode = 'login' }: { mode?: 'logi
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Field label="City">
-                    <select
-                      id="reg-city"
-                      value={regForm.city}
-                      onChange={(e) => setRegForm({ ...regForm, city: e.target.value })}
-                      className={inputCls}
-                    >
-                      <option value="Bengaluru">Bengaluru</option>
-                      <option value="Mumbai">Mumbai</option>
-                      <option value="Delhi NCR">Delhi NCR</option>
-                      <option value="Hyderabad">Hyderabad</option>
-                      <option value="Pune">Pune</option>
-                      <option value="Chennai">Chennai</option>
-                    </select>
+                  <Field label="City / Location *">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        id="reg-city"
+                        list="india-cities-list"
+                        value={regForm.city}
+                        onChange={(e) => setRegForm({ ...regForm, city: e.target.value })}
+                        placeholder="Search or enter any city / town"
+                        className={`${inputCls} pr-8`}
+                        autoComplete="off"
+                        required
+                      />
+                      <datalist id="india-cities-list">
+                        {INDIAN_CITIES.map((c) => (
+                          <option key={c} value={c} />
+                        ))}
+                      </datalist>
+                      <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-dim">
+                        <MapPin size={15} />
+                      </div>
+                    </div>
                   </Field>
 
                   <Field label="Occupation / Field">
